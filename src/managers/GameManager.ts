@@ -259,7 +259,7 @@ export class GameManager {
         // === TIER 7 (Cosmic Tech) ===
         // Parent changed: quantum_core -> recycling_tech (-2,5) to avoid crossing incinerator (-1,7)
         // Path: (-2,5) -> (-2,7). Crosses (-2,6) which is empty.
-        add('gravity_manipulator', '重力制御', 'ゴミの落下速度低下(積みやすい)', 2000000, 'recycling_tech', 3, 1.5, { x: -2, y: 7 }, () => { });
+        add('gravity_manipulator', '重力制御', 'ゴミの落下速度低下(積みやすい)', 2000000, 'recycling_tech', 3, 1.5, { x: -3, y: 7 }, () => { });
         // REMOVED PRESTIGE UNLOCK
         // add('prestige_unlock', '転生システム', '強くてニューゲーム', 10000000, 'quantum_core', 1, 1, { x: 0, y: 7 }, () => { });
         add('time_machine', 'タイムマシン', '失ったゴミを回収', 25000000, 'quantum_core', 1, 1, { x: 1, y: 7 }, () => { });
@@ -295,7 +295,7 @@ export class GameManager {
         add('unlock_battery', 'バッテリー回収', 'バッテリーゴミが出現（レアメタル獲得）', 500000, 'auto_sorter', 1, 1, { x: 5, y: 7 }, () => { });
 
         // Medical Waste - unlocks from incinerator
-        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: -2, y: 7 }, () => { });
+        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: 0, y: 8 }, () => { });
 
         // === SPACE DEVELOPMENT BRANCH ===
         // Satellite (Dark Matter) - unlocks from research_lab
@@ -311,11 +311,11 @@ export class GameManager {
 
         // === NUCLEAR ENERGY BRANCH ===
         // Nuclear Waste (Radioactive) - unlocks from unlock_bio
-        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'unlock_bio', 1, 1, { x: -2, y: 7 }, () => { });
+        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'unlock_bio', 1, 1, { x: -1, y: 9 }, () => { });
 
-        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -3, y: 8 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
+        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -2, y: 10 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
 
-        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -3, y: 9 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
+        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -2, y: 11 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
 
         // === QUANTUM PHYSICS BRANCH ===
         // Quantum Device (Quantum Crystal) - unlocks from quantum_core
