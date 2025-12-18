@@ -42,7 +42,8 @@ export class Trash extends Phaser.Physics.Matter.Image {
         if (type !== 'bio') this.setBounce(0.2);
 
         this.setInteractive();
-        this.on('pointerdown', this.onClicked, this);
+        // Use wrapper to prevent Pointer object from being passed as forceCrit
+        this.on('pointerdown', () => this.onClicked(false), this);
     }
 
     public onClicked(forceCrit: boolean = false): void {
