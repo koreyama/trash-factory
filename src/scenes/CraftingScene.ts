@@ -40,6 +40,27 @@ export class CraftingScene extends Phaser.Scene {
             icon: 'gadget-bot',
             desc: '30秒間、強力な収集ボットを追加召喚',
             cost: [{ type: 'metal', amount: 50 }, { type: 'circuit', amount: 20 }, { type: 'bioCell', amount: 5 }]
+        },
+        {
+            id: 'chain_lightning',
+            name: 'チェーンライトニング',
+            icon: 'gadget-lightning',
+            desc: 'クリックで電撃が連鎖（最大10体）',
+            cost: [{ type: 'radioactive', amount: 20 }, { type: 'circuit', amount: 50 }]
+        },
+        {
+            id: 'gravity_lasso',
+            name: 'グラビティラッソ',
+            icon: 'gadget-lasso',
+            desc: 'ドラッグでゴミを巻き込む重力の投げ縄',
+            cost: [{ type: 'darkMatter', amount: 30 }, { type: 'rareMetal', amount: 20 }]
+        },
+        {
+            id: 'quantum_sling',
+            name: '量子スリング',
+            icon: 'gadget-sling',
+            desc: 'ゴミを引っ張って発射、連鎖爆発',
+            cost: [{ type: 'quantumCrystal', amount: 15 }, { type: 'darkMatter', amount: 20 }]
         }
     ];
 

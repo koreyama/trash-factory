@@ -29,8 +29,8 @@ export interface Achievement {
     condition: (gm: GameManager) => boolean;
 }
 
-// Extended gadget types with new items
-export type GadgetType = 'dynamite' | 'magnet_bomb' | 'midas_gel' | 'overclock' | 'auto_bot' | 'nuclear_battery' | 'satellite_laser' | 'quantum_duplicator';
+// Extended gadget types (Merged)
+export type GadgetType = 'dynamite' | 'magnet_bomb' | 'midas_gel' | 'overclock' | 'auto_bot' | 'nuclear_battery' | 'satellite_laser' | 'quantum_duplicator' | 'chain_lightning' | 'gravity_lasso' | 'quantum_sling';
 
 export interface Gadget {
     id: GadgetType;

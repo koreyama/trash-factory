@@ -36,6 +36,16 @@ export class MainScene extends Phaser.Scene {
     private laserGridEnabled: boolean = true;
     private laserBtn: Phaser.GameObjects.Container | null = null;
 
+    // New Gadget State
+    private gravityLassoActive: boolean = false;
+    private gravityLassoTimer: number = 0;
+    private lassoGraphics: Phaser.GameObjects.Graphics | null = null;
+    private lassoPath: { x: number, y: number }[] = [];
+
+    private quantumSlingActive: boolean = false;
+    private slingTrash: Trash | null = null;
+    private slingStartPos: { x: number, y: number } | null = null;
+
     constructor() {
         super({ key: 'MainScene' });
     }
@@ -1330,6 +1340,19 @@ export class MainScene extends Phaser.Scene {
                 gm.useGadget(type);
                 this.spawnSuperDrone();
                 break;
+            case 'chain_lightning':
+                if (!pointer) return;
+                gm.useGadget(type);
+                this.chainLightning(pointer.worldX, pointer.worldY);
+                break;
+            case 'gravity_lasso':
+                gm.useGadget(type);
+                this.activateGravityLasso();
+                break;
+            case 'quantum_sling':
+                gm.useGadget(type);
+                this.activateQuantumSling();
+                break;
         }
 
         this.updateInventoryBar();
@@ -1426,5 +1449,278 @@ export class MainScene extends Phaser.Scene {
 
         new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "AUTO-BOT DEPLOYED!", "#00ffff");
     }
-}
 
+    // === CHAIN LIGHTNING ===
+    private chainLightning(startX: number, startY: number) {
+        const gm = GameManager.getInstance();
+        const trashGroup = this.children.getAll().filter(child => child instanceof Trash) as Trash[];
+        if (trashGroup.length === 0) return;
+
+        // Find nearest trash to click point
+        let closest: Trash | null = null;
+        let closestDist = Infinity;
+        trashGroup.forEach(t => {
+            const dist = Phaser.Math.Distance.Between(startX, startY, t.x, t.y);
+            if (dist < closestDist && dist < 200) {
+                closestDist = dist;
+                closest = t;
+            }
+        });
+
+        if (!closest) {
+            new FloatingText(this, startX, startY, "No target!", "#ff0000");
+            return;
+        }
+
+        // Chain up to 10 targets
+        const chainTargets: Trash[] = [closest];
+        const maxChain = 10;
+        const chainRange = 150;
+
+        for (let i = 0; i < maxChain - 1; i++) {
+            const last = chainTargets[chainTargets.length - 1];
+            let nextTarget: Trash | null = null;
+            let nextDist = Infinity;
+
+            trashGroup.forEach(t => {
+                if (chainTargets.includes(t)) return;
+                const dist = Phaser.Math.Distance.Between(last.x, last.y, t.x, t.y);
+                if (dist < nextDist && dist < chainRange) {
+                    nextDist = dist;
+                    nextTarget = t;
+                }
+            });
+
+            if (nextTarget) {
+                chainTargets.push(nextTarget);
+            } else {
+                break;
+            }
+        }
+
+        // Draw lightning and destroy
+        const graphics = this.add.graphics();
+        graphics.lineStyle(4, 0x00ffff, 1);
+        graphics.beginPath();
+        graphics.moveTo(startX, startY);
+
+        let totalReward = 0;
+        let multiplier = 1.0;
+
+        chainTargets.forEach((target, idx) => {
+            // Draw zigzag line
+            const prevX = idx === 0 ? startX : chainTargets[idx - 1].x;
+            const prevY = idx === 0 ? startY : chainTargets[idx - 1].y;
+
+            // Add some random zigzag
+            const midX = (prevX + target.x) / 2 + Phaser.Math.Between(-20, 20);
+            const midY = (prevY + target.y) / 2 + Phaser.Math.Between(-20, 20);
+
+            graphics.lineTo(midX, midY);
+            graphics.lineTo(target.x, target.y);
+
+            // Calculate reward with multiplier
+            const baseValue = gm.trashValue * gm.pressMultiplier * gm.marketingMultiplier;
+            const reward = Math.floor(baseValue * multiplier);
+            totalReward += reward;
+            multiplier *= 1.5; // Each chain increases reward
+
+            // Destroy with effect
+            target.destroyTrash(true);
+        });
+
+        graphics.strokePath();
+        this.cameras.main.shake(100, 0.01);
+
+        // Fade out graphics
+        this.tweens.add({
+            targets: graphics,
+            alpha: 0,
+            duration: 500,
+            onComplete: () => graphics.destroy()
+        });
+
+        new FloatingText(this, this.scale.width / 2, this.scale.height / 2,
+            `⚡ CHAIN x${chainTargets.length}!`, "#00ffff");
+        SoundManager.getInstance().play('click');
+    }
+
+    // === GRAVITY LASSO ===
+    private activateGravityLasso() {
+        this.gravityLassoActive = true;
+        this.gravityLassoTimer = 5000; // 5 seconds to use it
+        this.lassoPath = [];
+
+        // Create lasso graphics
+        if (this.lassoGraphics) this.lassoGraphics.destroy();
+        this.lassoGraphics = this.add.graphics();
+
+        new FloatingText(this, this.scale.width / 2, this.scale.height / 2,
+            "🪢 ドラッグでゴミを捕まえろ！", "#ff00ff");
+
+        // Track mouse movement
+        const onMove = (pointer: Phaser.Input.Pointer) => {
+            if (!this.gravityLassoActive) return;
+            if (!pointer.isDown) return;
+
+            this.lassoPath.push({ x: pointer.worldX, y: pointer.worldY });
+
+            // Draw lasso trail
+            if (this.lassoGraphics && this.lassoPath.length > 1) {
+                this.lassoGraphics.lineStyle(6, 0xff00ff, 0.8);
+                this.lassoGraphics.beginPath();
+                this.lassoGraphics.moveTo(this.lassoPath[0].x, this.lassoPath[0].y);
+                this.lassoPath.forEach(p => this.lassoGraphics!.lineTo(p.x, p.y));
+                this.lassoGraphics.strokePath();
+            }
+
+            // Check for trash in path
+            const trashGroup = this.children.getAll().filter(child => child instanceof Trash) as Trash[];
+            trashGroup.forEach(t => {
+                const dist = Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, t.x, t.y);
+                if (dist < 60) {
+                    t.destroyTrash(true);
+                }
+            });
+        };
+
+        const onUp = () => {
+            this.gravityLassoActive = false;
+            this.input.off('pointermove', onMove);
+            this.input.off('pointerup', onUp);
+
+            // Fade out lasso
+            if (this.lassoGraphics) {
+                this.tweens.add({
+                    targets: this.lassoGraphics,
+                    alpha: 0,
+                    duration: 300,
+                    onComplete: () => {
+                        if (this.lassoGraphics) {
+                            this.lassoGraphics.destroy();
+                            this.lassoGraphics = null;
+                        }
+                    }
+                });
+            }
+            this.lassoPath = [];
+        };
+
+        this.input.on('pointermove', onMove);
+        this.input.on('pointerup', onUp);
+    }
+
+    // === QUANTUM SLING ===
+    private activateQuantumSling() {
+        this.quantumSlingActive = true;
+
+        new FloatingText(this, this.scale.width / 2, this.scale.height / 2,
+            "🚀 ゴミをドラッグして発射！", "#9b59b6");
+
+        let slingGraphics: Phaser.GameObjects.Graphics | null = null;
+        let selectedTrash: Trash | null = null;
+        let startPos: { x: number, y: number } | null = null;
+
+        const onDown = (pointer: Phaser.Input.Pointer) => {
+            if (!this.quantumSlingActive) return;
+
+            // Find trash under pointer
+            const trashGroup = this.children.getAll().filter(child => child instanceof Trash) as Trash[];
+            for (const t of trashGroup) {
+                const dist = Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, t.x, t.y);
+                if (dist < 50) {
+                    selectedTrash = t;
+                    startPos = { x: t.x, y: t.y };
+                    slingGraphics = this.add.graphics();
+                    break;
+                }
+            }
+        };
+
+        const onMove = (pointer: Phaser.Input.Pointer) => {
+            if (!selectedTrash || !startPos || !slingGraphics) return;
+            if (!pointer.isDown) return;
+
+            // Draw slingshot line
+            slingGraphics.clear();
+            slingGraphics.lineStyle(4, 0x9b59b6, 1);
+            slingGraphics.beginPath();
+            slingGraphics.moveTo(startPos.x, startPos.y);
+            slingGraphics.lineTo(pointer.worldX, pointer.worldY);
+            slingGraphics.strokePath();
+
+            // Draw trajectory preview (opposite direction)
+            const dx = startPos.x - pointer.worldX;
+            const dy = startPos.y - pointer.worldY;
+            slingGraphics.lineStyle(2, 0x9b59b6, 0.5);
+            slingGraphics.lineTo(startPos.x + dx * 2, startPos.y + dy * 2);
+            slingGraphics.strokePath();
+        };
+
+        const onUp = (pointer: Phaser.Input.Pointer) => {
+            if (!selectedTrash || !startPos) {
+                this.quantumSlingActive = false;
+                this.input.off('pointerdown', onDown);
+                this.input.off('pointermove', onMove);
+                this.input.off('pointerup', onUp);
+                return;
+            }
+
+            // Calculate launch direction (opposite of drag)
+            const dx = startPos.x - pointer.worldX;
+            const dy = startPos.y - pointer.worldY;
+            const power = Math.min(Phaser.Math.Distance.Between(startPos.x, startPos.y, pointer.worldX, pointer.worldY) * 2, 800);
+
+            // Launch the trash
+            const angle = Math.atan2(dy, dx);
+            const launchX = startPos.x + Math.cos(angle) * power;
+            const launchY = startPos.y + Math.sin(angle) * power;
+
+            // Animate the launched trash
+            const launchedTrash = selectedTrash;
+            this.tweens.add({
+                targets: launchedTrash,
+                x: launchX,
+                y: launchY,
+                duration: 300,
+                ease: 'Quad.easeOut',
+                onUpdate: () => {
+                    // Check collision with other trash
+                    const trashGroup = this.children.getAll().filter(child =>
+                        child instanceof Trash && child !== launchedTrash
+                    ) as Trash[];
+
+                    trashGroup.forEach(t => {
+                        const dist = Phaser.Math.Distance.Between(launchedTrash.x, launchedTrash.y, t.x, t.y);
+                        if (dist < 60) {
+                            this.createExplosion(t.x, t.y);
+                            t.destroyTrash(true);
+                        }
+                    });
+                },
+                onComplete: () => {
+                    this.createExplosion(launchedTrash.x, launchedTrash.y);
+                    launchedTrash.destroyTrash(true);
+                }
+            });
+
+            // Cleanup
+            if (slingGraphics) {
+                slingGraphics.destroy();
+                slingGraphics = null;
+            }
+            selectedTrash = null;
+            startPos = null;
+            this.quantumSlingActive = false;
+            this.cameras.main.shake(100, 0.01);
+
+            this.input.off('pointerdown', onDown);
+            this.input.off('pointermove', onMove);
+            this.input.off('pointerup', onUp);
+        };
+
+        this.input.on('pointerdown', onDown);
+        this.input.on('pointermove', onMove);
+        this.input.on('pointerup', onUp);
+    }
+}
