@@ -18,7 +18,11 @@ const config: Phaser.Types.Core.GameConfig = {
     matter: {
       debug: false, // Set to true for debugging physics
       gravity: { x: 0, y: 1 },
-      enableSleeping: true // Already enabled - helps with performance
+      enableSleeping: true, // Bodies that stop moving become inactive - crucial for performance
+      // Performance optimizations for handling many objects
+      positionIterations: 4, // Default is 6, lower = faster but less accurate
+      velocityIterations: 2, // Default is 4, lower = faster but less accurate
+      constraintIterations: 1, // Default is 2
     }
   },
   scene: [TitleScene, MainScene, SkillTreeScene, AchievementScene, CraftingScene, SettingsScene],
@@ -41,4 +45,5 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   disableContextMenu: true
 };
+
 new Phaser.Game(config);

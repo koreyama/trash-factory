@@ -828,7 +828,7 @@ export class MainScene extends Phaser.Scene {
 
         const win = gm.getUpgrade('buy_planet');
         if (win && win.level > 0 && !this.victoryShown) {
-            this.showVictoryParams();
+            this.showVictoryToast(); // Changed to toast instead of permanent overlay
         }
 
         // Create inventory bar if crafting is unlocked but bar doesn't exist yet
@@ -846,24 +846,33 @@ export class MainScene extends Phaser.Scene {
     }
 
     private victoryShown = false;
-    private showVictoryParams() {
+    private showVictoryToast() {
         this.victoryShown = true;
-        const { width, height } = this.scale;
+        const { width } = this.scale;
 
-        this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
-        const text = this.add.text(width / 2, height / 2, '地球買収 完了\n\nGame Cleared!', {
+        // Create temporary toast notification instead of permanent overlay
+        const container = this.add.container(width / 2, -100);
+        const bg = this.add.rectangle(0, 0, 600, 100, 0x000000, 0.9).setStrokeStyle(3, 0xffd700);
+        const text = this.add.text(0, 0, '🎉 地球買収 完了! ゲームは続きます', {
             fontFamily: '"Noto Sans JP", sans-serif',
-            fontSize: '64px',
+            fontSize: '32px',
             color: '#ffd700',
             align: 'center',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
+        container.add([bg, text]);
+        container.setDepth(3000);
+
+        // Slide in, hold, slide out
         this.tweens.add({
-            targets: text,
-            scale: { from: 0, to: 1 },
-            duration: 1000,
-            ease: 'Back.out'
+            targets: container,
+            y: 100,
+            duration: 500,
+            ease: 'Back.out',
+            hold: 4000,
+            yoyo: true,
+            onComplete: () => container.destroy()
         });
     }
 
@@ -1392,16 +1401,30 @@ export class MainScene extends Phaser.Scene {
     }
 
     private spawnSuperDrone() {
-        if (this.superDrone) this.superDrone.destroy();
+        // Properly cleanup existing super drone before creating new one
+        if (this.superDrone) {
+            try {
+                // Stop all tweens on this object
+                this.tweens.killTweensOf(this.superDrone);
+                this.superDrone.destroy();
+            } catch (e) {
+                // Ignore errors if already destroyed
+            }
+            this.superDrone = null;
+        }
 
         this.autoBotActive = true;
         this.autoBotTimer = 30000;
 
         this.superDrone = new Drone(this, this.scale.width / 2, this.scale.height / 2);
         this.superDrone.setSpeedMultiplier(3.0); // Very fast
-        // Tint it to look differnet
-        (this.superDrone.list[0] as Phaser.GameObjects.Sprite).setTint(0x00ffff);
+
+        // Safely tint the drone
+        if (this.superDrone.list && this.superDrone.list[0]) {
+            (this.superDrone.list[0] as Phaser.GameObjects.Sprite).setTint(0x00ffff);
+        }
 
         new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "AUTO-BOT DEPLOYED!", "#00ffff");
     }
 }
+
