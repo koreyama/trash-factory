@@ -676,38 +676,9 @@ export class MainScene extends Phaser.Scene {
         this.hudContainer.setScrollFactor(0);
         this.hudContainer.setDepth(1000); // Ensure HUD is above trash
 
-        // Crafting Button (Gated)
-        const gm = GameManager.getInstance();
-        if (gm.getUpgrade('unlock_crafting')?.level ?? 0 > 0) {
-            this.createCraftingButton();
-        }
 
         this.updateUI();
     }
-
-    private createCraftingButton() {
-        if (this.craftButton) return; // Already created
-        const { width } = this.scale;
-        this.craftButton = this.add.container(width - 40, 160); // Below inventory
-
-        // Button Graphics
-        const bg = this.add.circle(0, 0, 25, 0x444444);
-        bg.setInteractive({ useHandCursor: true });
-
-        const icon = this.add.text(0, 0, '⚒️', { fontSize: '24px' }).setOrigin(0.5);
-
-        this.craftButton.add([bg, icon]);
-        this.craftButton.setDepth(2000);
-        this.craftButton.setScrollFactor(0);
-
-        bg.on('pointerdown', () => {
-            this.scene.launch('CraftingScene');
-            this.scene.pause();
-        });
-    }
-
-    // Stubs to fix type errors if button logic was elsewhere
-    private craftButton: Phaser.GameObjects.Container | undefined;
 
 
     private updateUI() {
@@ -871,24 +842,8 @@ export class MainScene extends Phaser.Scene {
         });
         achBtn.on('pointerout', () => achBtn.setColor(Theme.colors.text));
 
-        // Crafting Button
-        const craftBtn = this.add.text(350, 120, 'クラフト >', Theme.styles.buttonText)
-            .setInteractive({ useHandCursor: true })
-            .setDepth(1000)
-            .on('pointerdown', () => {
-                SoundManager.getInstance().play('click');
-                this.scene.pause();
-                this.scene.launch('CraftingScene');
-            });
-
-        craftBtn.on('pointerover', () => {
-            SoundManager.getInstance().play('hover');
-            craftBtn.setColor(Theme.colors.accent);
-        });
-        craftBtn.on('pointerout', () => craftBtn.setColor(Theme.colors.text));
-
-        // Settings Button
-        const settingsBtn = this.add.text(350, 170, '設定 >', Theme.styles.buttonText)
+        // Settings Button (before Crafting)
+        const settingsBtn = this.add.text(350, 120, '設定 >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
             .on('pointerdown', () => {
@@ -902,6 +857,26 @@ export class MainScene extends Phaser.Scene {
             settingsBtn.setColor(Theme.colors.accent);
         });
         settingsBtn.on('pointerout', () => settingsBtn.setColor(Theme.colors.text));
+
+        // Crafting Button - Only show if unlocked
+        const gm = GameManager.getInstance();
+        const craftingUp = gm.getUpgrade('unlock_crafting');
+        if (craftingUp && craftingUp.level > 0) {
+            const craftBtn = this.add.text(350, 170, 'クラフト >', Theme.styles.buttonText)
+                .setInteractive({ useHandCursor: true })
+                .setDepth(1000)
+                .on('pointerdown', () => {
+                    SoundManager.getInstance().play('click');
+                    this.scene.pause();
+                    this.scene.launch('CraftingScene');
+                });
+
+            craftBtn.on('pointerover', () => {
+                SoundManager.getInstance().play('hover');
+                craftBtn.setColor(Theme.colors.accent);
+            });
+            craftBtn.on('pointerout', () => craftBtn.setColor(Theme.colors.text));
+        }
     }
 
 
