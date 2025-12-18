@@ -324,7 +324,10 @@ export class MainScene extends Phaser.Scene {
 
         if (this.drone) this.drone.update();
         if (this.superDrone) this.superDrone.update();
-        if (this.blackHole) this.blackHole.update(delta);
+        if (this.blackHole) {
+            this.blackHole.update(delta);
+            this.updateBlackHoleButton(); // Keep button state in sync
+        }
 
         // Passive Magnet Field (Upgrade)
         const magnetUp = gm.getUpgrade('magnet_field');
@@ -762,8 +765,8 @@ export class MainScene extends Phaser.Scene {
 
     private createBlackHoleButton() {
         const { width } = this.scale;
-        // Position: Top Right, but lower than before to avoid overlap
-        this.blackHoleBtn = this.add.container(width - 300, 60);
+        // Position: Top Right row (y=10)
+        this.blackHoleBtn = this.add.container(width - 280, 10);
 
         const btnWidth = 150;
         const btnHeight = 40;
@@ -1008,8 +1011,8 @@ export class MainScene extends Phaser.Scene {
 
     private createLaserButton() {
         const { width } = this.scale;
-        // Position next to black hole button
-        this.laserBtn = this.add.container(width - 140, 60);
+        // Position: Top Right row, next to black hole button (y=10)
+        this.laserBtn = this.add.container(width - 120, 10);
 
         const btnWidth = 120;
         const btnHeight = 40;
@@ -1062,8 +1065,8 @@ export class MainScene extends Phaser.Scene {
         if (this.inventoryContainer) {
             this.inventoryContainer.destroy();
         }
-        // Move to Top-Right
-        this.inventoryContainer = this.add.container(width - 40, 60);
+        // Move to Top-Right, below buttons (y=110 to avoid overlap)
+        this.inventoryContainer = this.add.container(width - 40, 110);
         this.inventoryContainer.setDepth(2000);
 
         // Background (Vertical strip)
