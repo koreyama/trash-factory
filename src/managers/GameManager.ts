@@ -1,6 +1,8 @@
 
 export type ResourceType = 'plastic' | 'metal' | 'circuit' | 'bioCell' | 'rareMetal' | 'radioactive' | 'darkMatter' | 'quantumCrystal';
 
+// Tab categories for skill tree
+export type UpgradeCategory = 'processing' | 'automation' | 'research' | 'space' | 'endgame';
 
 export interface Upgrade {
     id: string;
@@ -14,10 +16,9 @@ export interface Upgrade {
     effect: (gm: GameManager, level: number) => void;
     resourceCost?: { type: ResourceType, amount: number };
     // Position for the visual tree (0,0 is root center)
-    // x: negative=left, positive=right
-    // y: negative=bottom(old), positive=up(new), but screen coords are y-down.
-    // Let's use logical coords: 0,0 = root. y+ = Up. x+ = Right.
     pos: { x: number, y: number };
+    // Category for tab-based organization (optional for backward compatibility)
+    category?: UpgradeCategory;
 }
 
 export interface Achievement {
@@ -28,7 +29,8 @@ export interface Achievement {
     condition: (gm: GameManager) => boolean;
 }
 
-export type GadgetType = 'dynamite' | 'magnet_bomb' | 'midas_gel' | 'overclock' | 'auto_bot';
+// Extended gadget types with new items
+export type GadgetType = 'dynamite' | 'magnet_bomb' | 'midas_gel' | 'overclock' | 'auto_bot' | 'nuclear_battery' | 'satellite_laser' | 'quantum_duplicator';
 
 export interface Gadget {
     id: GadgetType;
@@ -37,6 +39,7 @@ export interface Gadget {
     desc: string;
     cost: { type: ResourceType, amount: number }[];
 }
+
 
 export class GameManager {
     private static instance: GameManager;
@@ -123,13 +126,13 @@ export class GameManager {
 
 
     private initUpgrades() {
-        const add = (id: string, name: string, desc: string, cost: number, parent: string | null, maxLv: number, costMult: number, pos: { x: number, y: number }, effect: (gm: GameManager, lv: number) => void, resCost?: { type: ResourceType, amount: number }) => {
+        // Updated: add function with optional category parameter (defaults to 'processing')
+        const add = (id: string, name: string, desc: string, cost: number, parent: string | null, maxLv: number, costMult: number, pos: { x: number, y: number }, effect: (gm: GameManager, lv: number) => void, resCost?: { type: ResourceType, amount: number }, category: UpgradeCategory = 'processing') => {
             this.upgrades.push({
                 id, name, description: desc, baseCost: cost, costMultiplier: costMult,
-                level: 0, maxLevel: maxLv, parentId: parent, effect, resourceCost: resCost, pos
+                level: 0, maxLevel: maxLv, parentId: parent, effect, resourceCost: resCost, pos, category
             });
         };
-
         // ROOT (Center Bottom)
         add('root_mining', 'ゴミ処理免許', 'ゴミ処理業を開始する基本許可証。', 0, null, 1, 1, { x: 0, y: 0 }, () => { });
 
@@ -545,6 +548,56 @@ export class GameManager {
     getAllUpgrades() {
         return this.upgrades;
     }
+
+    // Get upgrades filtered by category
+    getUpgradesByCategory(category: UpgradeCategory): Upgrade[] {
+        return this.upgrades.filter(u => u.category === category);
+    }
+
+    // Check if a tab is unlocked based on D-plan conditions
+    isTabUnlocked(category: UpgradeCategory): boolean {
+        switch (category) {
+            case 'processing':
+                return true; // Always unlocked
+            case 'automation':
+                // Unlock when drone is purchased
+                const droneUp = this.getUpgrade('drone_unlock');
+                return droneUp ? droneUp.level > 0 : false;
+            case 'research':
+                // Unlock when totalMoney >= 1,000,000
+                return this.totalMoney >= 1000000;
+            case 'space':
+                // Unlock when unlock_satellite is purchased
+                const satUp = this.getUpgrade('unlock_satellite');
+                return satUp ? satUp.level > 0 : false;
+            case 'endgame':
+                // Unlock when mars_colony or quantum_teleport is purchased
+                const marsUp = this.getUpgrade('mars_colony');
+                const quantumUp = this.getUpgrade('quantum_teleport');
+                const marsUnlocked = marsUp && marsUp.level > 0;
+                const quantumUnlocked = quantumUp && quantumUp.level > 0;
+                return Boolean(marsUnlocked || quantumUnlocked);
+            default:
+                return false;
+        }
+    }
+
+    // Get tab unlock hint text
+    getTabUnlockHint(category: UpgradeCategory): string {
+        switch (category) {
+            case 'automation':
+                return '「ドローン」を購入で解放';
+            case 'research':
+                return '累計収入 ¥1,000,000 で解放';
+            case 'space':
+                return '「衛星回収許可」を購入で解放';
+            case 'endgame':
+                return '「火星コロニー」か「量子テレポート」で解放';
+            default:
+                return '';
+        }
+    }
+
 
     getCost(up: Upgrade): number {
         if (up.level >= up.maxLevel) return Infinity;
