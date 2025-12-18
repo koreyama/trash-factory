@@ -1,5 +1,5 @@
 
-export type ResourceType = 'plastic' | 'metal' | 'circuit' | 'bioCell';
+export type ResourceType = 'plastic' | 'metal' | 'circuit' | 'bioCell' | 'rareMetal' | 'radioactive' | 'darkMatter' | 'quantumCrystal';
 
 
 export interface Upgrade {
@@ -48,10 +48,20 @@ export class GameManager {
     public circuit: number = 0;
     public bioCell: number = 0;
 
+    // New Resources (Tier 6+)
+    public rareMetal: number = 0;
+    public radioactive: number = 0;
+    public darkMatter: number = 0;
+    public quantumCrystal: number = 0;
+
     public totalMoney: number = 0;
     public totalPlastic: number = 0;
     public totalMetal: number = 0;
     public totalCircuit: number = 0;
+    public totalRareMetal: number = 0;
+    public totalRadioactive: number = 0;
+    public totalDarkMatter: number = 0;
+    public totalQuantumCrystal: number = 0;
     public totalPress: number = 0;
 
     // Stats
@@ -269,7 +279,54 @@ export class GameManager {
         add('buy_planet', '地球買収', 'ゲームクリア', 100000000, 'black_hole_storage', 1, 1, { x: 0, y: 9 }, () => { console.log("WIN"); }, { type: 'metal', amount: 5000 });
         add('galactic_fed', '銀河連邦加盟', 'エンディング分岐B', 200000000, 'buy_planet', 1, 1, { x: 1, y: 10 }, () => { }, { type: 'circuit', amount: 9999 });
 
+        // =====================================================
+        // === NEW CONTENT: Extended Branches ===
+        // =====================================================
+
+        // === TIER 6: New Trash Types ===
+        // Battery (Rare Metal) - unlocks from auto_sorter
+        add('unlock_battery', 'バッテリー回収', 'バッテリーゴミが出現（レアメタル獲得）', 500000, 'auto_sorter', 1, 1, { x: 5, y: 7 }, () => { });
+
+        // Medical Waste - unlocks from incinerator
+        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: -2, y: 7 }, () => { });
+
+        // === SPACE DEVELOPMENT BRANCH ===
+        // Satellite (Dark Matter) - unlocks from research_lab
+        add('unlock_satellite', '衛星回収許可', '人工衛星パーツが出現（ダークマター獲得）', 5000000, 'research_lab', 1, 1, { x: -3, y: 6 }, () => { });
+
+        add('space_debris', '宇宙デブリ処理', '衛星パーツ出現率UP (+10%/Lv)', 8000000, 'unlock_satellite', 5, 1.5, { x: -4, y: 7 }, () => { });
+
+        add('orbital_station', '軌道ステーション', 'パッシブでダークマター獲得', 20000000, 'space_debris', 3, 2.0, { x: -5, y: 8 }, () => { });
+
+        add('moon_base', '月面基地', 'ダークマター生成速度2倍', 50000000, 'orbital_station', 1, 1, { x: -5, y: 9 }, () => { }, { type: 'darkMatter', amount: 500 });
+
+        add('mars_colony', '火星コロニー', '真のエンディング解放', 500000000, 'moon_base', 1, 1, { x: -4, y: 10 }, () => { console.log("MARS WIN"); }, { type: 'darkMatter', amount: 5000 });
+
+        // === NUCLEAR ENERGY BRANCH ===
+        // Nuclear Waste (Radioactive) - unlocks from unlock_bio
+        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'unlock_bio', 1, 1, { x: -2, y: 7 }, () => { });
+
+        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -3, y: 8 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
+
+        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -3, y: 9 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
+
+        // === QUANTUM PHYSICS BRANCH ===
+        // Quantum Device (Quantum Crystal) - unlocks from quantum_core
+        add('unlock_quantum', '量子デバイス回収', '量子デバイスが出現（量子結晶獲得）', 50000000, 'quantum_core', 1, 1, { x: 1, y: 8 }, () => { });
+
+        add('quantum_storage', '量子ストレージ', '床容量+500', 80000000, 'unlock_quantum', 3, 1.5, { x: 2, y: 9 }, (gm, lv) => { gm.trashCapacity += lv * 500; });
+
+        add('quantum_teleport', '量子テレポート', 'ゴミを瞬時に回収可能', 150000000, 'quantum_storage', 1, 1, { x: 3, y: 10 }, () => { });
+
+        add('quantum_multiverse', 'マルチバース', '並行世界から収入を得る', 1000000000, 'quantum_teleport', 1, 1, { x: 3, y: 11 }, () => { console.log("MULTIVERSE WIN"); }, { type: 'quantumCrystal', amount: 10000 });
+
+        // === RARE METAL BRANCH ===
+        add('rare_metal_processing', 'レアメタル精製', 'レアメタル獲得量+1/Lv', 1000000, 'unlock_battery', 5, 1.5, { x: 6, y: 8 }, () => { });
+
+        add('rare_alloy', '特殊合金', 'ガジェット効果2倍', 5000000, 'rare_metal_processing', 1, 1, { x: 7, y: 9 }, () => { }, { type: 'rareMetal', amount: 500 });
+
     }
+
 
     public addMoney(amount: number) {
         this.money += amount;
@@ -289,6 +346,18 @@ export class GameManager {
             this.totalCircuit += amount;
         } else if (type === 'bioCell') {
             this.bioCell += amount;
+        } else if (type === 'rareMetal') {
+            this.rareMetal += amount;
+            this.totalRareMetal += amount;
+        } else if (type === 'radioactive') {
+            this.radioactive += amount;
+            this.totalRadioactive += amount;
+        } else if (type === 'darkMatter') {
+            this.darkMatter += amount;
+            this.totalDarkMatter += amount;
+        } else if (type === 'quantumCrystal') {
+            this.quantumCrystal += amount;
+            this.totalQuantumCrystal += amount;
         }
         this.save();
     }
@@ -313,6 +382,22 @@ export class GameManager {
             return true;
         } else if (type === 'bioCell' && this.bioCell >= amount) {
             this.bioCell -= amount;
+            this.save();
+            return true;
+        } else if (type === 'rareMetal' && this.rareMetal >= amount) {
+            this.rareMetal -= amount;
+            this.save();
+            return true;
+        } else if (type === 'radioactive' && this.radioactive >= amount) {
+            this.radioactive -= amount;
+            this.save();
+            return true;
+        } else if (type === 'darkMatter' && this.darkMatter >= amount) {
+            this.darkMatter -= amount;
+            this.save();
+            return true;
+        } else if (type === 'quantumCrystal' && this.quantumCrystal >= amount) {
+            this.quantumCrystal -= amount;
             this.save();
             return true;
         }
@@ -483,6 +568,10 @@ export class GameManager {
             if (up.resourceCost.type === 'metal' && this.metal < up.resourceCost.amount) return false;
             if (up.resourceCost.type === 'circuit' && this.circuit < up.resourceCost.amount) return false;
             if (up.resourceCost.type === 'bioCell' && this.bioCell < up.resourceCost.amount) return false;
+            if (up.resourceCost.type === 'rareMetal' && this.rareMetal < up.resourceCost.amount) return false;
+            if (up.resourceCost.type === 'radioactive' && this.radioactive < up.resourceCost.amount) return false;
+            if (up.resourceCost.type === 'darkMatter' && this.darkMatter < up.resourceCost.amount) return false;
+            if (up.resourceCost.type === 'quantumCrystal' && this.quantumCrystal < up.resourceCost.amount) return false;
         }
 
         if (up.parentId) {
@@ -573,12 +662,20 @@ export class GameManager {
             metal: this.metal,
             circuit: this.circuit,
             bioCell: this.bioCell,
+            rareMetal: this.rareMetal,
+            radioactive: this.radioactive,
+            darkMatter: this.darkMatter,
+            quantumCrystal: this.quantumCrystal,
 
             // Lifetime
             totalMoney: this.totalMoney,
             totalPlastic: this.totalPlastic,
             totalMetal: this.totalMetal,
             totalCircuit: this.totalCircuit,
+            totalRareMetal: this.totalRareMetal,
+            totalRadioactive: this.totalRadioactive,
+            totalDarkMatter: this.totalDarkMatter,
+            totalQuantumCrystal: this.totalQuantumCrystal,
             pressCount: this.pressCount,
             prestigeMultiplier: this.prestigeMultiplier,
             inventory: this.inventory,
@@ -614,11 +711,19 @@ export class GameManager {
             this.metal = data.metal || 0;
             this.circuit = data.circuit || 0;
             this.bioCell = data.bioCell || 0;
+            this.rareMetal = data.rareMetal || 0;
+            this.radioactive = data.radioactive || 0;
+            this.darkMatter = data.darkMatter || 0;
+            this.quantumCrystal = data.quantumCrystal || 0;
 
             this.totalMoney = data.totalMoney || this.money;
             this.totalPlastic = data.totalPlastic || this.plastic;
             this.totalMetal = data.totalMetal || this.metal;
             this.totalCircuit = data.totalCircuit || this.circuit;
+            this.totalRareMetal = data.totalRareMetal || 0;
+            this.totalRadioactive = data.totalRadioactive || 0;
+            this.totalDarkMatter = data.totalDarkMatter || 0;
+            this.totalQuantumCrystal = data.totalQuantumCrystal || 0;
             this.pressCount = data.pressCount || 0;
             this.prestigeMultiplier = data.prestigeMultiplier || 1.0;
             this.inventory = data.inventory || {};

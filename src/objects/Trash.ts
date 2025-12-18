@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GameManager } from '../managers/GameManager';
 
-export type TrashType = 'general' | 'plastic' | 'metal' | 'circuit' | 'bio';
+export type TrashType = 'general' | 'plastic' | 'metal' | 'circuit' | 'bio' | 'battery' | 'medical' | 'nuclear' | 'satellite' | 'quantum';
 
 
 export class Trash extends Phaser.Physics.Matter.Image {
@@ -27,6 +27,24 @@ export class Trash extends Phaser.Physics.Matter.Image {
             this.setBody({ type: 'circle', radius: 18 });
             this.setDensity(0.001);
             this.setBounce(0.6); // Bouncy bio waste
+        } else if (texture === 'trash-battery') {
+            this.setBody({ type: 'rectangle', width: 20, height: 45 });
+            this.setDensity(0.006);
+        } else if (texture === 'trash-medical') {
+            this.setBody({ type: 'rectangle', width: 35, height: 35 });
+            this.setDensity(0.002);
+            this.setBounce(0.1);
+        } else if (texture === 'trash-nuclear') {
+            this.setBody({ type: 'circle', radius: 22 });
+            this.setDensity(0.008);
+        } else if (texture === 'trash-satellite') {
+            this.setBody({ type: 'rectangle', width: 50, height: 30 });
+            this.setDensity(0.003);
+            this.setBounce(0.3);
+        } else if (texture === 'trash-quantum') {
+            this.setBody({ type: 'rectangle', width: 25, height: 25 });
+            this.setDensity(0.01);
+            this.setBounce(0.5);
         } else {
             // Box or Metal
             this.setBody({ type: 'rectangle', width: 40, height: 40 });
@@ -93,6 +111,21 @@ export class Trash extends Phaser.Physics.Matter.Image {
         } else if (this.trashType === 'bio') {
             gm.addResource('bioCell', 1);
             gm.addMoney(Math.floor(value * 4.0));
+        } else if (this.trashType === 'battery') {
+            gm.addResource('rareMetal', 1);
+            gm.addMoney(Math.floor(value * 6.0));
+        } else if (this.trashType === 'medical') {
+            gm.addResource('bioCell', 2);
+            gm.addMoney(Math.floor(value * 5.0));
+        } else if (this.trashType === 'nuclear') {
+            gm.addResource('radioactive', 1);
+            gm.addMoney(Math.floor(value * 8.0));
+        } else if (this.trashType === 'satellite') {
+            gm.addResource('darkMatter', 1);
+            gm.addMoney(Math.floor(value * 10.0));
+        } else if (this.trashType === 'quantum') {
+            gm.addResource('quantumCrystal', 1);
+            gm.addMoney(Math.floor(value * 15.0));
         }
 
         this.scene.events.emit('trash-destroyed', { x: this.x, y: this.y, amount: value, type: this.trashType, isCrit, isGold, isRainbow });

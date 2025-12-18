@@ -120,7 +120,88 @@ export class MainScene extends Phaser.Scene {
             g.generateTexture('trash-bio', 36, 36);
         }
 
+        // === NEW TRASH TEXTURES ===
+
+        // Trash Battery (Yellow Cylinder)
+        if (!this.textures.exists('trash-battery')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            g.fillStyle(0xf1c40f, 1); // Yellow
+            g.fillRect(5, 0, 20, 45);
+            // Terminal
+            g.fillStyle(0x2c3e50, 1);
+            g.fillRect(8, 0, 14, 5);
+            g.fillRect(8, 40, 14, 5);
+            // + Symbol
+            g.fillStyle(0x000000, 1);
+            g.fillRect(12, 15, 6, 2);
+            g.fillRect(14, 13, 2, 6);
+            g.generateTexture('trash-battery', 30, 45);
+        }
+
+        // Trash Medical (Red Bag with Plus)
+        if (!this.textures.exists('trash-medical')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            g.fillStyle(0xe74c3c, 1); // Red
+            g.fillRect(0, 0, 35, 35);
+            g.lineStyle(2, 0xc0392b, 1);
+            g.strokeRect(0, 0, 35, 35);
+            // White Cross
+            g.fillStyle(0xffffff, 1);
+            g.fillRect(14, 8, 7, 19);
+            g.fillRect(8, 14, 19, 7);
+            g.generateTexture('trash-medical', 35, 35);
+        }
+
+        // Trash Nuclear (Green Barrel)
+        if (!this.textures.exists('trash-nuclear')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            g.fillStyle(0x27ae60, 1); // Green
+            g.fillCircle(22, 22, 22);
+            g.lineStyle(3, 0x1e8449, 1);
+            g.strokeCircle(22, 22, 22);
+            // Radiation Symbol
+            g.fillStyle(0xf1c40f, 1);
+            g.beginPath();
+            g.arc(22, 22, 8, 0, Math.PI * 2, false);
+            g.closePath();
+            g.fillPath();
+            g.generateTexture('trash-nuclear', 44, 44);
+        }
+
+        // Trash Satellite (Silver Panel)
+        if (!this.textures.exists('trash-satellite')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            g.fillStyle(0xbdc3c7, 1); // Silver
+            g.fillRect(0, 5, 50, 20);
+            // Solar Panels
+            g.fillStyle(0x3498db, 1);
+            g.fillRect(0, 0, 15, 30);
+            g.fillRect(35, 0, 15, 30);
+            // Grid lines
+            g.lineStyle(1, 0x2980b9, 0.5);
+            for (let i = 0; i < 5; i++) {
+                g.moveTo(i * 3, 0); g.lineTo(i * 3, 30);
+                g.moveTo(35 + i * 3, 0); g.lineTo(35 + i * 3, 30);
+            }
+            g.strokePath();
+            g.generateTexture('trash-satellite', 50, 30);
+        }
+
+        // Trash Quantum (Purple Cube)
+        if (!this.textures.exists('trash-quantum')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            g.fillStyle(0x9b59b6, 1); // Purple
+            g.fillRect(0, 0, 25, 25);
+            g.lineStyle(2, 0x8e44ad, 1);
+            g.strokeRect(0, 0, 25, 25);
+            // Glowing effect
+            g.fillStyle(0x00ffff, 0.5);
+            g.fillCircle(12, 12, 6);
+            g.generateTexture('trash-quantum', 25, 25);
+        }
+
         // --- Gadget Textures ---
+
 
         // Dynamite
         if (!this.textures.exists('gadget-dynamite')) {
@@ -526,7 +607,7 @@ export class MainScene extends Phaser.Scene {
         const y = -50;
 
         let texture = 'trash-box';
-        let type: 'general' | 'plastic' | 'metal' | 'circuit' | 'bio' = 'general';
+        let type: 'general' | 'plastic' | 'metal' | 'circuit' | 'bio' | 'battery' | 'medical' | 'nuclear' | 'satellite' | 'quantum' = 'general';
 
         const roll = Math.random();
 
@@ -537,12 +618,34 @@ export class MainScene extends Phaser.Scene {
         const circuitUp = gm.getUpgrade('unlock_circuit');
         const bioUp = gm.getUpgrade('unlock_bio');
 
+        // NEW: Extended content unlocks
+        const batteryUp = gm.getUpgrade('unlock_battery');
+        const medicalUp = gm.getUpgrade('unlock_medical');
+        const nuclearUp = gm.getUpgrade('unlock_nuclear');
+        const satelliteUp = gm.getUpgrade('unlock_satellite');
+        const quantumUp = gm.getUpgrade('unlock_quantum');
+
         const spawnVariety = gm.getUpgrade('spawn_variety');
 
         // Base rates
         const varietyBonus = spawnVariety ? spawnVariety.level * 0.05 : 0;
 
         // Probability Thresholds (High to Low rarity)
+        // NEW: Quantum (rarest) - 1%
+        const quantumChance = (quantumUp && quantumUp.level > 0) ? 0.01 : 0;
+
+        // NEW: Satellite - 2%
+        const satelliteChance = (satelliteUp && satelliteUp.level > 0) ? 0.02 : 0;
+
+        // NEW: Nuclear - 3%
+        const nuclearChance = (nuclearUp && nuclearUp.level > 0) ? 0.03 : 0;
+
+        // NEW: Battery - 5%
+        const batteryChance = (batteryUp && batteryUp.level > 0) ? 0.05 : 0;
+
+        // NEW: Medical - 5%
+        const medicalChance = (medicalUp && medicalUp.level > 0) ? 0.05 : 0;
+
         // Bio (Research Lab) - 5% + variety
         const bioChance = (bioUp && bioUp.level > 0) ? (0.05 + varietyBonus / 2) : 0;
 
@@ -556,16 +659,33 @@ export class MainScene extends Phaser.Scene {
         const plasticChance = (plasticUp && plasticUp.level > 0) ? (0.25 + varietyBonus) : 0;
 
         // Roll logic: check rarest first
-        if (roll < bioChance) {
+        let threshold = 0;
+
+        if (roll < (threshold += quantumChance)) {
+            type = 'quantum';
+            texture = 'trash-quantum';
+        } else if (roll < (threshold += satelliteChance)) {
+            type = 'satellite';
+            texture = 'trash-satellite';
+        } else if (roll < (threshold += nuclearChance)) {
+            type = 'nuclear';
+            texture = 'trash-nuclear';
+        } else if (roll < (threshold += batteryChance)) {
+            type = 'battery';
+            texture = 'trash-battery';
+        } else if (roll < (threshold += medicalChance)) {
+            type = 'medical';
+            texture = 'trash-medical';
+        } else if (roll < (threshold += bioChance)) {
             type = 'bio';
             texture = 'trash-bio';
-        } else if (roll < bioChance + circuitChance) {
+        } else if (roll < (threshold += circuitChance)) {
             type = 'circuit';
             texture = 'trash-circuit';
-        } else if (roll < bioChance + circuitChance + metalChance) {
+        } else if (roll < (threshold += metalChance)) {
             type = 'metal';
             texture = 'trash-metal';
-        } else if (roll < bioChance + circuitChance + metalChance + plasticChance) {
+        } else if (roll < (threshold += plasticChance)) {
             type = 'plastic';
             texture = 'trash-plastic';
         } else {
@@ -589,6 +709,7 @@ export class MainScene extends Phaser.Scene {
         }
     }
 
+
     private getTrashCount(): number {
         let count = 0;
         this.matter.world.getAllBodies().forEach((b: any) => {
@@ -611,6 +732,11 @@ export class MainScene extends Phaser.Scene {
     private circuitTextRef!: Phaser.GameObjects.Text;
     private bioTextRef!: Phaser.GameObjects.Text;
     private energyTextRef!: Phaser.GameObjects.Text;
+    // NEW: Extended resources
+    private rareMetalTextRef!: Phaser.GameObjects.Text;
+    private radioactiveTextRef!: Phaser.GameObjects.Text;
+    private darkMatterTextRef!: Phaser.GameObjects.Text;
+    private quantumCrystalTextRef!: Phaser.GameObjects.Text;
 
     private createHUD() {
         this.hudContainer = this.add.container(20, 20);
@@ -625,9 +751,9 @@ export class MainScene extends Phaser.Scene {
         bg.fillStyle(0x000000, 0.7);
         bg.lineStyle(2, Number(Theme.colors.accent.replace('#', '0x')), 1);
 
-        // Main Panel: 320x330 (Tighter fit)
-        bg.fillRoundedRect(0, 0, 320, 330, 10);
-        bg.strokeRoundedRect(0, 0, 320, 330, 10);
+        // Main Panel: 320x530 (Extended for new resources)
+        bg.fillRoundedRect(0, 0, 320, 530, 10);
+        bg.strokeRoundedRect(0, 0, 320, 530, 10);
 
         // Header Line
         bg.lineStyle(1, 0x555555);
@@ -672,6 +798,11 @@ export class MainScene extends Phaser.Scene {
         this.circuitTextRef = createRow('電子基板', '#2ecc71', '🔌');
         this.bioTextRef = createRow('バイオ細胞', '#9b59b6', '🧬');
         this.energyTextRef = createRow('エネルギー', '#e67e22', '⚡');
+        // NEW: Extended resources
+        this.rareMetalTextRef = createRow('レアメタル', '#3498db', '💎');
+        this.radioactiveTextRef = createRow('放射性物質', '#27ae60', '☢️');
+        this.darkMatterTextRef = createRow('ダークマター', '#2c3e50', '🌑');
+        this.quantumCrystalTextRef = createRow('量子結晶', '#00ffff', '💠');
 
         this.hudContainer.setScrollFactor(0);
         this.hudContainer.setDepth(1000); // Ensure HUD is above trash
@@ -689,6 +820,11 @@ export class MainScene extends Phaser.Scene {
         if (this.circuitTextRef) this.circuitTextRef.setText(`${gm.circuit.toLocaleString()}`);
         if (this.bioTextRef) this.bioTextRef.setText(`${gm.bioCell.toLocaleString()}`);
         if (this.energyTextRef) this.energyTextRef.setText(`${Math.floor(gm.energy)} / ${gm.maxEnergy}`);
+        // NEW: Extended resources
+        if (this.rareMetalTextRef) this.rareMetalTextRef.setText(`${gm.rareMetal.toLocaleString()}`);
+        if (this.radioactiveTextRef) this.radioactiveTextRef.setText(`${gm.radioactive.toLocaleString()}`);
+        if (this.darkMatterTextRef) this.darkMatterTextRef.setText(`${gm.darkMatter.toLocaleString()}`);
+        if (this.quantumCrystalTextRef) this.quantumCrystalTextRef.setText(`${gm.quantumCrystal.toLocaleString()}`);
 
         const win = gm.getUpgrade('buy_planet');
         if (win && win.level > 0 && !this.victoryShown) {
