@@ -32,6 +32,10 @@ export class MainScene extends Phaser.Scene {
     private autoBotActive: boolean = false;
     private autoBotTimer: number = 0;
 
+    // Laser Grid State
+    private laserGridEnabled: boolean = true;
+    private laserBtn: Phaser.GameObjects.Container | null = null;
+
     constructor() {
         super({ key: 'MainScene' });
     }
@@ -894,47 +898,123 @@ export class MainScene extends Phaser.Scene {
         const laserUp = gm.getUpgrade('laser_grid');
         if (!laserUp || laserUp.level === 0) return;
 
+        // Update laser button visibility
+        this.updateLaserButton();
+
+        // Check if laser is enabled
+        if (!this.laserGridEnabled) return;
+
         this.laserTimer += delta;
-        if (this.laserTimer < 500) return; // 2Hz
+        if (this.laserTimer < 300) return; // ~3.3Hz
         this.laserTimer = 0;
 
-        if (gm.energy < 5) return; // Need minimal energy
+        const energyCost = 3;
+        if (gm.energy < energyCost) return;
 
-        // Find trash
+        // Horizontal penetrating laser from left to right at random Y
+        const { width, height } = this.scale;
+        const laserY = Phaser.Math.Between(height * 0.4, height * 0.85);
+
+        // Find all trash that the laser passes through
         const bodies = this.matter.world.getAllBodies();
-        let target: any = null;
+        const hitTrash: Trash[] = [];
+        const laserThickness = 20; // How thick the laser "hitbox" is
 
         for (const b of bodies) {
             if ((b as any).gameObject && (b as any).gameObject instanceof Trash && !(b as any).gameObject.isDestroyed && !(b as any).isStatic) {
-                // Check height?
-                if (b.position.y > 400) { // Lower half
-                    target = b;
-                    break;
+                const t = (b as any).gameObject as Trash;
+                // Check if trash is within laser Y range
+                if (Math.abs(t.y - laserY) < laserThickness + 20) {
+                    hitTrash.push(t);
                 }
             }
         }
 
-        if (target) {
-            const t = (target as any).gameObject as Trash;
-            // Zap
-            const startX = (this.scale.width / 2) + ((Math.random() > 0.5 ? 1 : -1) * 300); // From sides
-            const startY = 100;
+        if (hitTrash.length === 0) return;
 
-            // Visual
-            const line = this.add.line(0, 0, startX, startY, t.x, t.y, 0xff0000).setOrigin(0);
-            line.setLineWidth(3);
-            this.tweens.add({
-                targets: line,
-                alpha: 0,
-                duration: 200,
-                onComplete: () => line.destroy()
-            });
+        // Consume energy
+        gm.addEnergy(-energyCost);
 
+        // Visual: Horizontal penetrating laser beam
+        const line = this.add.line(0, 0, 0, laserY, width, laserY, 0xff0000).setOrigin(0);
+        line.setLineWidth(4);
+        line.setAlpha(0.8);
+
+        // Glow effect
+        const glow = this.add.line(0, 0, 0, laserY, width, laserY, 0xff6666).setOrigin(0);
+        glow.setLineWidth(8);
+        glow.setAlpha(0.3);
+
+        this.tweens.add({
+            targets: [line, glow],
+            alpha: 0,
+            duration: 150,
+            onComplete: () => {
+                line.destroy();
+                glow.destroy();
+            }
+        });
+
+        // Destroy all hit trash
+        for (const t of hitTrash) {
             t.destroyTrash();
-            gm.addEnergy(-5);
-
             new FloatingText(this, t.x, t.y, "ZAP!", "#ff0000");
         }
+    }
+
+    private updateLaserButton() {
+        const gm = GameManager.getInstance();
+        const laserUp = gm.getUpgrade('laser_grid');
+
+        // Create button if unlocked but not yet created
+        if (laserUp && laserUp.level > 0 && !this.laserBtn) {
+            this.createLaserButton();
+        }
+
+        // Update visibility
+        if (this.laserBtn) {
+            this.laserBtn.setVisible(!!laserUp && laserUp.level > 0);
+        }
+    }
+
+    private createLaserButton() {
+        const { width } = this.scale;
+        this.laserBtn = this.add.container(width - 180, 10);
+
+        const btnWidth = 120;
+        const btnHeight = 40;
+        const radius = 8;
+
+        const bg = this.add.graphics();
+        bg.fillStyle(this.laserGridEnabled ? 0xe74c3c : 0x555555, 1);
+        bg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
+        bg.lineStyle(2, 0xffffff, 0.5);
+        bg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
+
+        const hitArea = this.add.rectangle(btnWidth / 2, btnHeight / 2, btnWidth, btnHeight, 0x000000, 0);
+        hitArea.setInteractive({ useHandCursor: true });
+
+        const text = this.add.text(btnWidth / 2, btnHeight / 2, this.laserGridEnabled ? 'LASER ON' : 'LASER OFF', {
+            ...Theme.styles.buttonText,
+            fontSize: '14px'
+        }).setOrigin(0.5);
+
+        hitArea.on('pointerdown', () => {
+            SoundManager.getInstance().play('click');
+            this.laserGridEnabled = !this.laserGridEnabled;
+
+            // Update visuals
+            bg.clear();
+            bg.fillStyle(this.laserGridEnabled ? 0xe74c3c : 0x555555, 1);
+            bg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
+            bg.lineStyle(2, 0xffffff, 0.5);
+            bg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
+
+            text.setText(this.laserGridEnabled ? 'LASER ON' : 'LASER OFF');
+        });
+
+        this.laserBtn.add([bg, text, hitArea]);
+        this.laserBtn.setDepth(1000);
     }
 
     // === INVENTORY SYSTEM ===
