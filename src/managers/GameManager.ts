@@ -133,8 +133,12 @@ export class GameManager {
                 level: 0, maxLevel: maxLv, parentId: parent, effect, resourceCost: resCost, pos, category
             });
         };
-        // ROOT (Center Bottom)
-        add('root_mining', 'ゴミ処理免許', 'ゴミ処理業を開始する基本許可証。', 0, null, 1, 1, { x: 0, y: 0 }, () => { });
+
+        // =====================================================
+        // === PROCESSING TAB (初期解放) ===
+        // =====================================================
+        add('root_mining', 'ゴミ処理免許', 'ゴミ処理業を開始する基本許可証。', 0, null, 1, 1, { x: 0, y: 0 }, () => { }, undefined, 'processing');
+
 
         // === TIER 1 (Basics) ===
         // === TIER 1 (Basics) ===
@@ -328,7 +332,114 @@ export class GameManager {
 
         add('rare_alloy', '特殊合金', 'ガジェット効果2倍', 5000000, 'rare_metal_processing', 1, 1, { x: 7, y: 9 }, () => { }, { type: 'rareMetal', amount: 500 });
 
+        // =====================================================
+        // === CATEGORY ASSIGNMENT (Assign upgrades to tabs) ===
+        // =====================================================
+
+        // PROCESSING: Basic trash handling (initial unlocked)
+        const processingIds = [
+            'root_mining', 'spawn_speed', 'val_base', 'vacuum_unlock',
+            'floor_capacity', 'unlock_plastic', 'vacuum_power',
+            'spawn_variety', 'unlock_metal', 'vacuum_range',
+            'unlock_circuit', 'luck_unlock', 'marketing',
+            'rainbow_trash', 'unlock_crafting', 'combo_chip',
+            'click_crit', 'market_manipulation'
+        ];
+
+        // AUTOMATION: Drones and auto systems (unlock with drone)
+        const automationIds = [
+            'drone_unlock', 'drone_spec', 'drone_ai',
+            'black_hole_unlock', 'hawking_radiation', 'event_horizon', 'singularity_engine',
+            'auto_press', 'dynamite_spec', 'gadget_mastery', 'magnet_field',
+            'auto_miner', 'auto_factory', 'auto_sorter', 'unlock_industry', 'global_mining'
+        ];
+
+        // RESEARCH: Science and energy (unlock with ¥1M total)
+        const researchIds = [
+            'research_lab', 'unlock_bio', 'incinerator', 'nanobot_swarm',
+            'solar_panel', 'battery_upgrade', 'laser_grid',
+            'recycling_tech', 'quantum_core',
+            'unlock_medical', 'unlock_nuclear', 'nuclear_reactor', 'fusion_reactor'
+        ];
+
+        // SPACE: Space exploration (unlock with satellite)
+        const spaceIds = [
+            'unlock_satellite', 'space_debris', 'orbital_station', 'moon_base',
+            'unlock_battery', 'rare_metal_processing', 'rare_alloy',
+            'gravity_manipulator', 'time_machine', 'time_warp'
+        ];
+
+        // ENDGAME: Final content (unlock with mars_colony or quantum_teleport)
+        const endgameIds = [
+            'mars_colony', 'black_hole_storage', 'buy_planet', 'galactic_fed',
+            'unlock_quantum', 'quantum_storage', 'quantum_teleport', 'quantum_multiverse',
+            'quantum_destabilizer'
+        ];
+
+        // Apply categories
+        this.upgrades.forEach(u => {
+            if (processingIds.includes(u.id)) u.category = 'processing';
+            else if (automationIds.includes(u.id)) u.category = 'automation';
+            else if (researchIds.includes(u.id)) u.category = 'research';
+            else if (spaceIds.includes(u.id)) u.category = 'space';
+            else if (endgameIds.includes(u.id)) u.category = 'endgame';
+            // Default: processing
+        });
+
+        // Reset positions for each category (so nodes don't overlap)
+        this.recalculatePositions();
     }
+
+    // Recalculate positions for upgrades in each category
+    private recalculatePositions() {
+        const categoryRoots: Record<UpgradeCategory, string[]> = {
+            'processing': ['root_mining'],
+            'automation': ['drone_unlock'],
+            'research': ['research_lab'],
+            'space': ['unlock_satellite'],
+            'endgame': ['mars_colony', 'unlock_quantum']
+        };
+
+        // Set root positions for each category
+        const categories: UpgradeCategory[] = ['processing', 'automation', 'research', 'space', 'endgame'];
+        categories.forEach(cat => {
+            const roots = categoryRoots[cat];
+            const catUpgrades = this.upgrades.filter(u => u.category === cat);
+
+            // Find root(s) and set position
+            roots.forEach((rootId, idx) => {
+                const root = catUpgrades.find(u => u.id === rootId);
+                if (root) {
+                    // Multiple roots get spread horizontally
+                    root.pos = { x: idx === 0 ? (roots.length > 1 ? -1 : 0) : 1, y: 0 };
+                    root.parentId = null; // Ensure roots have no parent in their tab
+                }
+            });
+
+            // BFS to assign positions to children
+            this.assignPositionsBFS(catUpgrades, roots);
+        });
+    }
+
+    private assignPositionsBFS(upgrades: Upgrade[], rootIds: string[]) {
+        const visited = new Set<string>(rootIds);
+        const queue: { id: string; depth: number; xOffset: number }[] =
+            rootIds.map((id, i) => ({ id, depth: 0, xOffset: i === 0 ? (rootIds.length > 1 ? -2 : 0) : 2 }));
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            const children = upgrades.filter(u => u.parentId === current.id && !visited.has(u.id));
+
+            children.forEach((child, idx) => {
+                visited.add(child.id);
+                const spread = children.length > 1 ? (idx - (children.length - 1) / 2) : 0;
+                child.pos = { x: current.xOffset + spread, y: current.depth + 1 };
+                queue.push({ id: child.id, depth: current.depth + 1, xOffset: current.xOffset + spread });
+            });
+        }
+    }
+
+
 
 
     public addMoney(amount: number) {
