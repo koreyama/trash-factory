@@ -300,6 +300,62 @@ export class MainScene extends Phaser.Scene {
             g.generateTexture('gadget-bot', 50, 50);
         }
 
+        // Chain Lightning
+        if (!this.textures.exists('gadget-lightning')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            // Lightning bolt
+            g.fillStyle(0x00ffff, 1); // Cyan
+            g.beginPath();
+            g.moveTo(30, 5); g.lineTo(15, 22); g.lineTo(25, 22);
+            g.lineTo(10, 45); g.lineTo(35, 22); g.lineTo(25, 22);
+            g.lineTo(35, 5);
+            g.closePath();
+            g.fillPath();
+            // Glow
+            g.fillStyle(0xffffff, 0.3);
+            g.fillCircle(25, 25, 18);
+            g.generateTexture('gadget-lightning', 50, 50);
+        }
+
+        // Gravity Lasso
+        if (!this.textures.exists('gadget-lasso')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            // Spiral rope
+            g.lineStyle(4, 0xff00ff, 1); // Purple
+            g.beginPath();
+            g.arc(25, 25, 18, 0, Math.PI * 1.5);
+            g.strokePath();
+            g.lineStyle(4, 0xff00ff, 0.7);
+            g.beginPath();
+            g.arc(25, 25, 12, Math.PI * 0.5, Math.PI * 2);
+            g.strokePath();
+            // Center
+            g.fillStyle(0x9b59b6, 1);
+            g.fillCircle(25, 25, 6);
+            g.generateTexture('gadget-lasso', 50, 50);
+        }
+
+        // Quantum Sling
+        if (!this.textures.exists('gadget-sling')) {
+            const g = this.make.graphics({ x: 0, y: 0 });
+            // Slingshot Y shape
+            g.lineStyle(5, 0x8b4513, 1); // Brown
+            g.beginPath();
+            g.moveTo(10, 10); g.lineTo(25, 30);
+            g.moveTo(40, 10); g.lineTo(25, 30);
+            g.moveTo(25, 30); g.lineTo(25, 45);
+            g.strokePath();
+            // Rubber band
+            g.lineStyle(3, 0x9b59b6, 1);
+            g.beginPath();
+            g.moveTo(10, 10); g.lineTo(25, 20); g.lineTo(40, 10);
+            g.strokePath();
+            // Projectile
+            g.fillStyle(0xe74c3c, 1);
+            g.fillCircle(25, 18, 5);
+            g.generateTexture('gadget-sling', 50, 50);
+        }
+
         // Particle
         if (!this.textures.exists('particle')) {
             const g = this.make.graphics({ x: 0, y: 0 });
@@ -1200,7 +1256,7 @@ export class MainScene extends Phaser.Scene {
         this.inventoryContainer.setDepth(2000);
 
         // Background (Vertical strip)
-        const bg = this.add.rectangle(0, 160, 70, 380, 0x000000, 0.7);
+        const bg = this.add.rectangle(0, 240, 70, 590, 0x000000, 0.7);
         bg.setStrokeStyle(2, 0x555555);
         this.inventoryContainer.add(bg);
 
@@ -1210,7 +1266,10 @@ export class MainScene extends Phaser.Scene {
             { id: 'magnet_bomb', icon: 'gadget-magnet' },
             { id: 'midas_gel', icon: 'gadget-midas' },
             { id: 'overclock', icon: 'gadget-overclock' },
-            { id: 'auto_bot', icon: 'gadget-bot' }
+            { id: 'auto_bot', icon: 'gadget-bot' },
+            { id: 'chain_lightning', icon: 'gadget-lightning' },
+            { id: 'gravity_lasso', icon: 'gadget-lasso' },
+            { id: 'quantum_sling', icon: 'gadget-sling' }
         ];
 
         const spacing = 70;
