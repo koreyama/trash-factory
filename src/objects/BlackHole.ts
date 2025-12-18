@@ -117,6 +117,10 @@ export class BlackHole extends Phaser.GameObjects.Container {
         return this._state !== 'UNSTABLE';
     }
 
+    public isActive(): boolean {
+        return this._state === 'ACTIVE' || this._state === 'UNSTABLE';
+    }
+
     private applyGravity(_delta: number) {
         // Upgrade affects Range/Force
         const gm = GameManager.getInstance();

@@ -757,51 +757,80 @@ export class MainScene extends Phaser.Scene {
         });
     }
 
+    private blackHoleBg!: Phaser.GameObjects.Graphics;
+    private blackHoleText!: Phaser.GameObjects.Text;
+
     private createBlackHoleButton() {
         const { width } = this.scale;
-        // Position: Top Right, Left of Inventory (width-40).
-        // Inventory starts y=60.
-        // Let's put this at y=10.
-        this.blackHoleBtn = this.add.container(width - 240, 10);
+        // Position: Top Right, but lower than before to avoid overlap
+        this.blackHoleBtn = this.add.container(width - 300, 60);
 
-        const btnWidth = 180;
+        const btnWidth = 150;
         const btnHeight = 40;
         const radius = 8;
 
-        const bg = this.add.graphics();
-        bg.fillStyle(0x8e44ad, 1); // Purple
-        bg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
-        bg.lineStyle(2, 0xffffff, 0.5);
-        bg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
+        this.blackHoleBg = this.add.graphics();
+        this.blackHoleBg.fillStyle(0x555555, 1); // Start as OFF (grey)
+        this.blackHoleBg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
+        this.blackHoleBg.lineStyle(2, 0xffffff, 0.5);
+        this.blackHoleBg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
 
         const hitArea = this.add.rectangle(btnWidth / 2, btnHeight / 2, btnWidth, btnHeight, 0x000000, 0);
 
         hitArea.setInteractive({ useHandCursor: true });
         hitArea.on('pointerdown', () => {
+            SoundManager.getInstance().play('click');
             if (!this.blackHole.isStable()) {
                 this.blackHole.triggerBigBang();
             } else {
                 this.blackHole.toggle();
             }
+            this.updateBlackHoleButton();
         });
 
         // Hover effect
-        hitArea.on('pointerover', () => this.tweens.add({ targets: bg, alpha: 0.8, duration: 100 }));
-        hitArea.on('pointerout', () => this.tweens.add({ targets: bg, alpha: 1.0, duration: 100 }));
+        hitArea.on('pointerover', () => this.tweens.add({ targets: this.blackHoleBg, alpha: 0.8, duration: 100 }));
+        hitArea.on('pointerout', () => this.tweens.add({ targets: this.blackHoleBg, alpha: 1.0, duration: 100 }));
 
-        const text = this.add.text(btnWidth / 2, btnHeight / 2, 'BLACK HOLE', {
+        this.blackHoleText = this.add.text(btnWidth / 2, btnHeight / 2, 'B.HOLE OFF', {
             ...Theme.styles.buttonText,
-            fontSize: '16px'
+            fontSize: '14px'
         });
-        text.setOrigin(0.5);
+        this.blackHoleText.setOrigin(0.5);
 
-        this.blackHoleBtn.add([bg, text, hitArea]);
+        this.blackHoleBtn.add([this.blackHoleBg, this.blackHoleText, hitArea]);
         this.blackHoleBtn.setDepth(1000);
         // Initial visibility check?
         const gm = GameManager.getInstance();
         if (!gm.getUpgrade('black_hole_unlock') || gm.getUpgrade('black_hole_unlock')?.level === 0) {
             this.blackHoleBtn.setVisible(false);
         }
+    }
+
+    private updateBlackHoleButton() {
+        if (!this.blackHoleBg || !this.blackHoleText) return;
+
+        const isActive = this.blackHole.isActive();
+        const isUnstable = !this.blackHole.isStable();
+
+        const btnWidth = 150;
+        const btnHeight = 40;
+        const radius = 8;
+
+        this.blackHoleBg.clear();
+        if (isUnstable) {
+            this.blackHoleBg.fillStyle(0xff00ff, 1); // Magenta for unstable
+            this.blackHoleText.setText('BIG BANG!');
+        } else if (isActive) {
+            this.blackHoleBg.fillStyle(0x8e44ad, 1); // Purple for ON
+            this.blackHoleText.setText('B.HOLE ON');
+        } else {
+            this.blackHoleBg.fillStyle(0x555555, 1); // Grey for OFF
+            this.blackHoleText.setText('B.HOLE OFF');
+        }
+        this.blackHoleBg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
+        this.blackHoleBg.lineStyle(2, 0xffffff, 0.5);
+        this.blackHoleBg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
     }
 
 
@@ -979,7 +1008,8 @@ export class MainScene extends Phaser.Scene {
 
     private createLaserButton() {
         const { width } = this.scale;
-        this.laserBtn = this.add.container(width - 180, 10);
+        // Position next to black hole button
+        this.laserBtn = this.add.container(width - 140, 60);
 
         const btnWidth = 120;
         const btnHeight = 40;
