@@ -717,6 +717,12 @@ export class MainScene extends Phaser.Scene {
             this.showVictoryParams();
         }
 
+        // Create inventory bar if crafting is unlocked but bar doesn't exist yet
+        const craftingUp = gm.getUpgrade('unlock_crafting');
+        if (craftingUp && craftingUp.level > 0 && !this.inventoryContainer) {
+            this.createInventoryBar();
+        }
+
         this.updateInventoryBar();
 
         if (this.blackHoleBtn) {

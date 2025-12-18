@@ -45,13 +45,13 @@ export class Trash extends Phaser.Physics.Matter.Image {
         this.on('pointerdown', this.onClicked, this);
     }
 
-    public onClicked(): void {
+    public onClicked(forceCrit: boolean = false): void {
         if (this.isDestroyed) return;
 
-        this.destroyTrash();
+        this.destroyTrash(forceCrit);
     }
 
-    public destroyTrash(): void {
+    public destroyTrash(forceCrit: boolean = false): void {
         this.isDestroyed = true;
 
         const gm = GameManager.getInstance();
@@ -69,10 +69,12 @@ export class Trash extends Phaser.Physics.Matter.Image {
             value *= 50;
         }
 
-        // Crit Check
-        let isCrit = false;
-        if (Math.random() < gm.critChance) {
+        // Crit Check (forced for drone)
+        let isCrit = forceCrit;
+        if (!isCrit && Math.random() < gm.critChance) {
             isCrit = true;
+        }
+        if (isCrit) {
             value *= 3;
         }
 

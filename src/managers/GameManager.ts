@@ -125,10 +125,10 @@ export class GameManager {
 
         // === TIER 1 (Basics) ===
         // === TIER 1 (Basics) ===
-        // Rebalance: spawn_speed maxLv 8 -> 50. Cost curve steeper.
-        add('spawn_speed', '搬入速度', 'ゴミ出現頻度UP (-50ms/Lv)', 200, 'root_mining', 50, 1.8, { x: -1, y: 1 }, (gm, lv) => {
-            // 1000ms start, min 100ms.
-            gm.spawnDelay = Math.max(100, 1000 - (lv * 50));
+        // Rebalance: spawn_speed maxLv 20. More impactful per level.
+        add('spawn_speed', '搬入速度', 'ゴミ出現頻度UP (-100ms/Lv)', 200, 'root_mining', 20, 1.6, { x: -1, y: 1 }, (gm, lv) => {
+            // 1000ms start, min 100ms. Each level = -100ms.
+            gm.spawnDelay = Math.max(100, 1000 - (lv * 100));
         });
         add('val_base', '基礎価値', 'ゴミの基本価値UP (+5円/Lv)', 100, 'root_mining', 20, 1.5, { x: 0, y: 1 }, (gm, lv) => {
             gm.trashValue = 10 + (lv * 5);
@@ -136,9 +136,9 @@ export class GameManager {
         add('vacuum_unlock', '吸引装置', '長押しでゴミを吸い寄せる', 300, 'root_mining', 1, 1, { x: 1, y: 1 }, () => { });
 
         // === TIER 2 (Expansion) ===
-        // Rebalance: floor_capacity maxLv 10 -> 100. Cost curve steeper 1.4 -> 2.0? 1.5.
-        add('floor_capacity', '床面積拡張', '最大ゴミ数+10個/Lv', 1500, 'spawn_speed', 100, 1.6, { x: -2, y: 2 }, (gm, lv) => {
-            gm.trashCapacity = 30 + (lv * 10);
+        // Rebalance: floor_capacity maxLv 50. More impactful per level.
+        add('floor_capacity', '床面積拡張', '最大ゴミ数+30個/Lv', 1500, 'spawn_speed', 50, 1.5, { x: -2, y: 2 }, (gm, lv) => {
+            gm.trashCapacity = 30 + (lv * 30);
         });
         add('unlock_plastic', 'プラ回収許可', 'プラスチックゴミが出現', 500, 'spawn_speed', 1, 1, { x: -1, y: 2 }, () => { });
 

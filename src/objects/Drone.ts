@@ -105,7 +105,7 @@ export class Drone extends Phaser.GameObjects.Container {
                 if (currentTarget && !currentTarget.isDestroyed) {
                     const finalDist = Phaser.Math.Distance.Between(this.x, this.y, currentTarget.x, currentTarget.y);
                     if (finalDist < 80) {
-                        currentTarget.onClicked();
+                        currentTarget.onClicked(true); // Force critical for drone
                     }
                 }
                 this.returnHome();
