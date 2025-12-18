@@ -189,7 +189,7 @@ export class GameManager {
             gm.dynamiteRange = 150 + (lv * 30);
         });
 
-        add('solar_panel', 'ソーラーパネル', 'エネルギー自動生成', 20000, 'unlock_crafting', 10, 1.5, { x: 2, y: 4 }, (gm, lv) => {
+        add('solar_panel', 'ソーラーパネル', '毎秒エネルギー+1/Lv（レーザー用）', 20000, 'unlock_crafting', 10, 1.5, { x: 2, y: 4 }, (gm, lv) => {
             gm.energyGeneration = lv * 1;
         });
 
@@ -217,7 +217,7 @@ export class GameManager {
             gm.maxEnergy = 100 + (lv * 100);
         });
 
-        add('unlock_industry', '産業革命', 'パッシブ収入系を解禁', 100000, 'drone_spec', 1, 1, { x: 3, y: 5 }, () => { });
+        add('unlock_industry', '産業革命', '自動資源生成・売却系を解禁', 100000, 'drone_spec', 1, 1, { x: 3, y: 5 }, () => { });
         add('drone_ai', 'AI制御', 'ドローンの効率化', 120000, 'drone_spec', 1, 1, { x: 5, y: 5 }, () => { });
 
         // === TIER 6 (Future Tech) ===
@@ -229,14 +229,14 @@ export class GameManager {
         // Parent changed: research_lab -> rainbow_trash (0,6) to avoid crossing Y=6
         add('quantum_core', '量子コア', '全速度倍増', 1000000, 'rainbow_trash', 1, 1, { x: 0, y: 7 }, () => { });
 
-        add('laser_grid', '防衛レーザー', '触れたゴミを自動焼却', 250000, 'battery_upgrade', 5, 2.0, { x: 2, y: 6 }, (gm, lv) => {
+        add('laser_grid', '防衛レーザー', '画面下半分のゴミを自動焦却（エネルギー消費）', 250000, 'battery_upgrade', 5, 2.0, { x: 2, y: 6 }, (gm, lv) => {
             gm.laserPower = lv * 10;
         });
 
-        add('magnet_field', '磁力場', '金属ゴミを自動誘引', 40000, 'gadget_mastery', 1, 1, { x: 1, y: 6 }, () => { });
+        add('magnet_field', '磁力場', '金属・基板ゴミを画面中央に引き寄せる', 40000, 'gadget_mastery', 1, 1, { x: 1, y: 6 }, () => { });
 
-        add('auto_miner', '自動採掘', '資源を自動生成', 200000, 'unlock_industry', 10, 1.3, { x: 4, y: 6 }, () => { });
-        add('auto_factory', '自動工場', '資源を自動売却', 500000, 'unlock_industry', 10, 1.4, { x: 5, y: 6 }, () => { });
+        add('auto_miner', '自動採掘', '毎秒プラ+金属をLv個ずつ獲得', 200000, 'unlock_industry', 10, 1.3, { x: 4, y: 6 }, () => { });
+        add('auto_factory', '自動工場', '毎秒プラ+金属をLv個売却して換金', 500000, 'unlock_industry', 10, 1.4, { x: 5, y: 6 }, () => { });
 
         // === TIER 7 (Cosmic Tech) ===
         // === TIER 7 (Cosmic Tech) ===
@@ -253,7 +253,7 @@ export class GameManager {
         // === TIER 8 (Dimensional) ===
         // Black Hole (End of Press Branch)
         // Black Hole (End of Press Branch)
-        add('black_hole_storage', '無限圧縮', '容量無限大(仮)', 50000000, 'gravity_manipulator', 1, 1, { x: -2, y: 8 }, (gm) => { gm.trashCapacity = 9999; }); // Increased limit
+        add('black_hole_storage', '無限圧縮', '床面積上限を9999に拡張', 50000000, 'gravity_manipulator', 1, 1, { x: -2, y: 8 }, (gm) => { gm.trashCapacity = 9999; });
 
         // REMOVED MULTIVERSE
         // add('multiverse', '多元宇宙', '並行世界から収入を得る', 50000000, 'prestige_unlock', 1, 1, { x: 0, y: 8 }, () => { });
