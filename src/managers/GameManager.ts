@@ -240,7 +240,7 @@ export class GameManager {
         // === TIER 6 (Future Tech) ===
         add('quantum_destabilizer', '量子分解', '爆発で資源を獲得可能に', 800000, 'singularity_engine', 1, 1, { x: -4, y: 6 }, () => { });
 
-        add('incinerator', '廃棄物発電', 'バイオゴミ消却時にエナジー', 100000, 'unlock_bio', 5, 1.6, { x: -1, y: 7 }, () => { });
+        add('incinerator', '廃棄物発電', 'バイオゴミ消却時にエナジー', 100000, 'unlock_bio', 5, 1.6, { x: -2, y: 7 }, () => { });
 
         // Shifted (0,6) -> (0,7)
         // Parent changed: research_lab -> rainbow_trash (0,6) to avoid crossing Y=6
@@ -270,14 +270,14 @@ export class GameManager {
         // === TIER 8 (Dimensional) ===
         // Black Hole (End of Press Branch)
         // Black Hole (End of Press Branch)
-        add('black_hole_storage', '無限圧縮', '床面積上限を9999に拡張', 50000000, 'gravity_manipulator', 1, 1, { x: -2, y: 8 }, (gm) => { gm.trashCapacity = 9999; });
+        add('black_hole_storage', '無限圧縮', '床面積上限を9999に拡張', 50000000, 'gravity_manipulator', 1, 1, { x: -3, y: 8 }, (gm) => { gm.trashCapacity = 9999; });
 
         // REMOVED MULTIVERSE
         // add('multiverse', '多元宇宙', '並行世界から収入を得る', 50000000, 'prestige_unlock', 1, 1, { x: 0, y: 8 }, () => { });
 
         add('time_warp', '時間跳躍', '時間加速スキル', 75000000, 'time_machine', 1, 1, { x: 2, y: 8 }, () => { });
 
-        add('nanobot_swarm', 'ナノボット', '画面全体のゴミを徐々に分解', 1000000, 'incinerator', 1, 1, { x: -1, y: 8 }, () => { });
+        add('nanobot_swarm', 'ナノボット', '画面全体のゴミを徐々に分解', 1000000, 'incinerator', 1, 1, { x: -2, y: 8 }, () => { });
 
         // === TIER 9 (Divine) ===
         // === TIER 9 (Divine) ===
@@ -295,27 +295,27 @@ export class GameManager {
         add('unlock_battery', 'バッテリー回収', 'バッテリーゴミが出現（レアメタル獲得）', 500000, 'auto_sorter', 1, 1, { x: 5, y: 7 }, () => { });
 
         // Medical Waste - unlocks from incinerator
-        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: 0, y: 8 }, () => { });
+        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: -1, y: 8 }, () => { });
 
         // === SPACE DEVELOPMENT BRANCH ===
         // Satellite (Dark Matter) - unlocks from research_lab
-        add('unlock_satellite', '衛星回収許可', '人工衛星パーツが出現（ダークマター獲得）', 5000000, 'research_lab', 1, 1, { x: -3, y: 6 }, () => { });
+        add('unlock_satellite', '衛星回収許可', '人工衛星パーツが出現（ダークマター獲得）', 5000000, 'research_lab', 1, 1, { x: -4, y: 6 }, () => { });
 
-        add('space_debris', '宇宙デブリ処理', '衛星パーツ出現率UP (+10%/Lv)', 8000000, 'unlock_satellite', 5, 1.5, { x: -4, y: 7 }, () => { });
+        add('space_debris', '宇宙デブリ処理', '衛星パーツ出現率UP (+10%/Lv)', 8000000, 'unlock_satellite', 5, 1.5, { x: -5, y: 7 }, () => { });
 
-        add('orbital_station', '軌道ステーション', 'パッシブでダークマター獲得', 20000000, 'space_debris', 3, 2.0, { x: -5, y: 8 }, () => { });
+        add('orbital_station', '軌道ステーション', 'パッシブでダークマター獲得', 20000000, 'space_debris', 3, 2.0, { x: -6, y: 8 }, () => { });
 
-        add('moon_base', '月面基地', 'ダークマター生成速度2倍', 50000000, 'orbital_station', 1, 1, { x: -5, y: 9 }, () => { }, { type: 'darkMatter', amount: 500 });
+        add('moon_base', '月面基地', 'ダークマター生成速度2倍', 50000000, 'orbital_station', 1, 1, { x: -7, y: 9 }, () => { }, { type: 'darkMatter', amount: 500 });
 
-        add('mars_colony', '火星コロニー', '真のエンディング解放', 500000000, 'moon_base', 1, 1, { x: -4, y: 10 }, () => { console.log("MARS WIN"); }, { type: 'darkMatter', amount: 5000 });
+        add('mars_colony', '火星コロニー', '真のエンディング解放', 500000000, 'moon_base', 1, 1, { x: -7, y: 10 }, () => { console.log("MARS WIN"); }, { type: 'darkMatter', amount: 5000 });
 
         // === NUCLEAR ENERGY BRANCH ===
-        // Nuclear Waste (Radioactive) - unlocks from unlock_bio
-        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'unlock_bio', 1, 1, { x: -1, y: 9 }, () => { });
+        // Nuclear Waste (Radioactive) - unlocks from unlock_bio -> Changed to incinerator to avoid overlap
+        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'incinerator', 1, 1, { x: -3, y: 9 }, () => { });
 
-        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -2, y: 10 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
+        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -3, y: 10 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
 
-        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -2, y: 11 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
+        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -3, y: 11 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
 
         // === QUANTUM PHYSICS BRANCH ===
         // Quantum Device (Quantum Crystal) - unlocks from quantum_core
