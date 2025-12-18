@@ -1390,9 +1390,8 @@ export class MainScene extends Phaser.Scene {
                 this.spawnSuperDrone();
                 break;
             case 'chain_lightning':
-                if (!pointer) return;
                 gm.useGadget(type);
-                this.chainLightning(pointer.worldX, pointer.worldY);
+                this.chainLightning();
                 break;
             case 'gravity_lasso':
                 gm.useGadget(type);
@@ -1500,73 +1499,70 @@ export class MainScene extends Phaser.Scene {
     }
     // === CHAIN LIGHTNING ===
     // Automatically targets up to 10 trash and chains between them
-    private chainLightning(_startX: number, _startY: number) {
-        const gm = GameManager.getInstance();
-        const trashGroup = this.children.getAll().filter(child => child instanceof Trash) as Trash[];
+    private chainLightning() {
+        const trashGroup = this.children.getAll().filter(child =>
+            child instanceof Trash && !(child as Trash).isDestroyed
+        ) as Trash[];
+
         if (trashGroup.length === 0) {
             new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "対象なし！", "#ff0000");
             return;
         }
 
         // Start from a random trash
-        const closest = trashGroup[Math.floor(Math.random() * trashGroup.length)];
-
-        // Chain up to 10 targets
-        const chainTargets: Trash[] = [closest];
+        const startTrash = trashGroup[Math.floor(Math.random() * trashGroup.length)];
+        const chainTargets: Trash[] = [startTrash];
         const maxChain = Math.min(10, trashGroup.length);
-        const chainRange = 200;
+        const chainRange = 250;
 
+        // Build chain
         for (let i = 0; i < maxChain - 1; i++) {
             const last = chainTargets[chainTargets.length - 1];
             let nextTarget: Trash | null = null;
             let nextDist = Infinity;
 
-            trashGroup.forEach(t => {
-                if (chainTargets.includes(t)) return;
+            for (const t of trashGroup) {
+                if (chainTargets.includes(t) || t.isDestroyed) continue;
                 const dist = Phaser.Math.Distance.Between(last.x, last.y, t.x, t.y);
                 if (dist < nextDist && dist < chainRange) {
                     nextDist = dist;
                     nextTarget = t;
                 }
-            });
-
-            if (nextTarget) {
-                chainTargets.push(nextTarget);
-            } else {
-                break;
             }
+
+            if (nextTarget) chainTargets.push(nextTarget);
+            else break;
         }
 
-        // Draw lightning and destroy
+        // Draw lightning
         const graphics = this.add.graphics();
-        graphics.lineStyle(4, 0x00ffff, 1);
+        graphics.lineStyle(5, 0x00ffff, 1);
 
-        chainTargets.forEach((target, idx) => {
-            // Draw zigzag line
-            const prevX = idx === 0 ? target.x : chainTargets[idx - 1].x;
-            const prevY = idx === 0 ? target.y - 50 : chainTargets[idx - 1].y;
-
-            // Add some random zigzag
-            const midX = (prevX + target.x) / 2 + Phaser.Math.Between(-20, 20);
-            const midY = (prevY + target.y) / 2 + Phaser.Math.Between(-20, 20);
+        for (let i = 0; i < chainTargets.length; i++) {
+            const target = chainTargets[i];
+            const prevX = i === 0 ? target.x : chainTargets[i - 1].x;
+            const prevY = i === 0 ? target.y - 60 : chainTargets[i - 1].y;
 
             graphics.beginPath();
             graphics.moveTo(prevX, prevY);
-            graphics.lineTo(midX, midY);
             graphics.lineTo(target.x, target.y);
             graphics.strokePath();
+        }
 
-            // Destroy with effect
-            target.destroyTrash(true);
+        // Destroy with delay to prevent physics freeze
+        chainTargets.forEach((target, idx) => {
+            this.time.delayedCall(idx * 50, () => {
+                if (!target.isDestroyed) {
+                    target.destroyTrash(true);
+                }
+            });
         });
 
         this.cameras.main.shake(100, 0.01);
-
-        // Fade out graphics
         this.tweens.add({
             targets: graphics,
             alpha: 0,
-            duration: 500,
+            duration: 400,
             onComplete: () => graphics.destroy()
         });
 
@@ -1576,9 +1572,12 @@ export class MainScene extends Phaser.Scene {
     }
 
     // === GRAVITY LASSO ===
-    // Creates a vortex that sucks in all trash on screen
+    // Destroys all trash on screen with a vortex effect
     private activateGravityLasso() {
-        const trashGroup = this.children.getAll().filter(child => child instanceof Trash) as Trash[];
+        const trashGroup = this.children.getAll().filter(child =>
+            child instanceof Trash && !(child as Trash).isDestroyed
+        ) as Trash[];
+
         if (trashGroup.length === 0) {
             new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "対象なし！", "#ff0000");
             return;
@@ -1594,30 +1593,23 @@ export class MainScene extends Phaser.Scene {
         vortex.beginPath();
         vortex.arc(centerX, centerY, 100, 0, Math.PI * 2);
         vortex.strokePath();
-        vortex.lineStyle(4, 0xff00ff, 0.5);
-        vortex.arc(centerX, centerY, 60, 0, Math.PI * 2);
-        vortex.strokePath();
 
         new FloatingText(this, centerX, centerY - 50, "🪢 GRAVITY LASSO!", "#ff00ff");
 
-        // Pull all trash to center and destroy
-        let destroyed = 0;
-        trashGroup.forEach((t, idx) => {
-            this.tweens.add({
-                targets: t,
-                x: centerX,
-                y: centerY,
-                duration: 300 + idx * 30,
-                ease: 'Quad.easeIn',
-                onComplete: () => {
+        // Destroy all trash with staggered timing
+        const count = Math.min(trashGroup.length, 20); // Limit to 20 to prevent freeze
+        for (let i = 0; i < count; i++) {
+            const t = trashGroup[i];
+            this.time.delayedCall(i * 40, () => {
+                if (!t.isDestroyed) {
+                    this.createExplosion(t.x, t.y);
                     t.destroyTrash(true);
-                    destroyed++;
                 }
             });
-        });
+        }
 
         // Cleanup vortex
-        this.time.delayedCall(800, () => {
+        this.time.delayedCall(count * 40 + 200, () => {
             this.tweens.add({
                 targets: vortex,
                 alpha: 0,
@@ -1626,82 +1618,76 @@ export class MainScene extends Phaser.Scene {
             });
         });
 
-        this.cameras.main.shake(200, 0.02);
+        this.cameras.main.shake(150, 0.015);
         SoundManager.getInstance().play('click');
     }
 
     // === QUANTUM SLING ===
-    // Launches the nearest trash which explodes on impact
+    // Destroys multiple trash in a line with explosion
     private activateQuantumSling() {
-        const trashGroup = this.children.getAll().filter(child => child instanceof Trash) as Trash[];
+        const trashGroup = this.children.getAll().filter(child =>
+            child instanceof Trash && !(child as Trash).isDestroyed
+        ) as Trash[];
+
         if (trashGroup.length === 0) {
             new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "対象なし！", "#ff0000");
             return;
         }
 
-        // Pick a random trash to launch
-        const projectile = trashGroup[Math.floor(Math.random() * trashGroup.length)];
-        const startX = projectile.x;
-        const startY = projectile.y;
+        // Random starting point
+        const startTrash = trashGroup[Math.floor(Math.random() * trashGroup.length)];
+        const startX = startTrash.x;
+        const startY = startTrash.y;
 
-        // Launch to a random direction
+        // Random direction
         const angle = Math.random() * Math.PI * 2;
-        const power = 400;
-        const targetX = startX + Math.cos(angle) * power;
-        const targetY = startY + Math.sin(angle) * power;
+        const endX = startX + Math.cos(angle) * 600;
+        const endY = startY + Math.sin(angle) * 600;
 
         // Visual line
         const slingLine = this.add.graphics();
-        slingLine.lineStyle(4, 0x9b59b6, 1);
+        slingLine.lineStyle(6, 0x9b59b6, 1);
         slingLine.beginPath();
         slingLine.moveTo(startX, startY);
-        slingLine.lineTo(targetX, targetY);
+        slingLine.lineTo(endX, endY);
         slingLine.strokePath();
 
         new FloatingText(this, startX, startY - 30, "🚀 QUANTUM SLING!", "#9b59b6");
 
-        // Animate projectile
-        this.tweens.add({
-            targets: projectile,
-            x: targetX,
-            y: targetY,
-            duration: 400,
-            ease: 'Quad.easeOut',
-            onUpdate: () => {
-                // Check collision with other trash
-                const others = this.children.getAll().filter(child =>
-                    child instanceof Trash && child !== projectile
-                ) as Trash[];
+        // Destroy trash along the line
+        const destroyed: Trash[] = [];
+        for (const t of trashGroup) {
+            if (t.isDestroyed) continue;
 
-                others.forEach(t => {
-                    const dist = Phaser.Math.Distance.Between(projectile.x, projectile.y, t.x, t.y);
-                    if (dist < 80) {
-                        this.createExplosion(t.x, t.y);
-                        t.destroyTrash(true);
-                    }
-                });
-            },
-            onComplete: () => {
-                this.createExplosion(projectile.x, projectile.y);
-                projectile.destroyTrash(true);
+            // Check if trash is close to the line
+            const distToLine = Phaser.Math.Distance.BetweenPointsSquared(
+                { x: t.x, y: t.y },
+                Phaser.Geom.Line.GetNearestPoint(
+                    new Phaser.Geom.Line(startX, startY, endX, endY),
+                    new Phaser.Geom.Point(t.x, t.y)
+                )
+            );
 
-                // Destroy nearby trash
-                const finalTrash = this.children.getAll().filter(child => child instanceof Trash) as Trash[];
-                finalTrash.forEach(t => {
-                    const dist = Phaser.Math.Distance.Between(projectile.x, projectile.y, t.x, t.y);
-                    if (dist < 150) {
-                        this.createExplosion(t.x, t.y);
-                        t.destroyTrash(true);
-                    }
-                });
+            if (distToLine < 10000) { // Within ~100px of line
+                destroyed.push(t);
             }
+        }
+
+        // Destroy with staggered timing
+        destroyed.forEach((t, idx) => {
+            this.time.delayedCall(idx * 30, () => {
+                if (!t.isDestroyed) {
+                    this.createExplosion(t.x, t.y);
+                    t.destroyTrash(true);
+                }
+            });
         });
 
         // Cleanup line
         this.tweens.add({
             targets: slingLine,
             alpha: 0,
-            duration: 400,
+            duration: 500,
             onComplete: () => slingLine.destroy()
         });
 
