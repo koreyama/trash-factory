@@ -32,7 +32,7 @@ export class Drone extends Phaser.GameObjects.Container {
 
     private findTarget() {
         const gm = GameManager.getInstance();
-        if (!gm.droneUnlocked) {
+        if (!gm.droneUnlocked || !gm.dronesActive) {
             this.setVisible(false);
             return;
         }

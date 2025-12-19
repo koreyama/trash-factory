@@ -94,9 +94,16 @@ export class GameManager {
     // Flags
     public trashCapacity: number = 30;
     public droneUnlocked: boolean = false;
+    public dronesActive: boolean = false; // Default OFF
     public droneSpeed: number = 100;
     public droneCount: number = 1;
     public droneCapacity: number = 1;
+
+    public conveyorUnlocked: boolean = false; // New: Conveyor facility
+    public conveyorActive: boolean = false; // Default OFF
+    public shippedTrashBuffer: any[] = []; // New: Stores trash between main and refinery
+    public refineryInventory: Record<string, number> = {}; // PERSISTENT
+
 
     public plasticPerTrash: number = 1;
 
@@ -206,6 +213,7 @@ export class GameManager {
 
         add('unlock_crafting', 'クラフト許可', 'ガジェット製作を解禁', 5000, 'unlock_metal', 1, 1, { x: 2, y: 3 }, () => { });
         add('drone_unlock', '自律ドローン', '自動回収ドローンを配備', 30000, 'unlock_metal', 1, 1, { x: 3, y: 3 }, (gm) => { gm.droneUnlocked = true; });
+        add('unlock_conveyor', 'ベルトコンベア', 'ゴミを精製所へ送り自動処理する', 50000, 'unlock_metal', 1, 1, { x: 4, y: 3 }, (gm) => { gm.conveyorUnlocked = true; }, { type: 'metal', amount: 200 });
 
         // === TIER 4 (Technological Leap) ===
         // Black Hole Branch
@@ -848,6 +856,7 @@ export class GameManager {
             pressCount: this.pressCount,
             prestigeMultiplier: this.prestigeMultiplier,
             inventory: this.inventory,
+            refineryInventory: this.refineryInventory,
 
             stats: {
                 vacuumPower: this.vacuumPower,
@@ -904,6 +913,7 @@ export class GameManager {
             this.pressCount = data.pressCount || 0;
             this.prestigeMultiplier = data.prestigeMultiplier || 1.0;
             this.inventory = data.inventory || {};
+            this.refineryInventory = data.refineryInventory || {};
 
             // Restore stats
             if (data.stats) {

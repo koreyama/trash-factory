@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameManager } from '../managers/GameManager';
+import { SoundManager } from '../managers/SoundManager';
 import { Trash } from './Trash';
 import { FloatingText } from './FloatingText';
 
@@ -106,9 +107,11 @@ export class BlackHole extends Phaser.GameObjects.Container {
     public toggle() {
         if (this._state === 'DORMANT') {
             this._state = 'ACTIVE';
+            SoundManager.getInstance().startLoop('blackhole', 'blackhole_suck');
             return true;
         } else {
             this._state = 'DORMANT';
+            SoundManager.getInstance().stopLoop('blackhole');
             return false;
         }
     }
@@ -180,6 +183,10 @@ export class BlackHole extends Phaser.GameObjects.Container {
     public triggerBigBang() {
         if (this.consumedMass <= 0) return;
 
+        // Stop Suck Sound
+        SoundManager.getInstance().stopLoop('blackhole');
+        SoundManager.getInstance().playBigBang();
+
         // Explosion Visual
         this.scene.cameras.main.shake(500, 0.05);
 
@@ -199,5 +206,6 @@ export class BlackHole extends Phaser.GameObjects.Container {
 
     private deactivate() {
         this._state = 'DORMANT';
+        SoundManager.getInstance().stopLoop('blackhole');
     }
 }

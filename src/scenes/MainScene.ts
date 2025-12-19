@@ -32,9 +32,15 @@ export class MainScene extends Phaser.Scene {
     private autoBotActive: boolean = false;
     private autoBotTimer: number = 0;
 
-    // Laser Grid State
-    private laserGridEnabled: boolean = true;
+    // Facility State
+    private laserGridEnabled: boolean = false;
     private laserBtn: Phaser.GameObjects.Container | null = null;
+    private droneToggleBtn!: Phaser.GameObjects.Container;
+    private conveyorToggleBtn: Phaser.GameObjects.Container | null = null;
+    private refineryBtn: Phaser.GameObjects.Container | null = null;
+    private conveyorBelt: Phaser.GameObjects.Rectangle | null = null;
+    private conveyorStripeGraphics: Phaser.GameObjects.Graphics | null = null;
+    private conveyorStripeOffset: number = 0;
 
     constructor() {
         super({ key: 'MainScene' });
@@ -456,9 +462,9 @@ export class MainScene extends Phaser.Scene {
                 this.dragRange.y = pointer.y;
             }
         } else {
-            // Vacuum Logic
+            // Vacuum Logic (Right Click ONLY)
             const vacUp = gm.getUpgrade('vacuum_unlock');
-            if (pointer.isDown && vacUp && vacUp.level > 0) {
+            if (pointer.rightButtonDown() && vacUp && vacUp.level > 0) {
                 this.handleVacuum(pointer);
             }
         }
@@ -466,6 +472,7 @@ export class MainScene extends Phaser.Scene {
         // Auto Press Logic (Throttled)
         this.checkAutoPress(delta);
         this.checkLaserGrid(delta);
+        this.updateFacilities();
 
         if (this.drone) this.drone.update();
         if (this.superDrone) this.superDrone.update();
@@ -496,6 +503,48 @@ export class MainScene extends Phaser.Scene {
             });
         }
         this.handlePassiveIncome(delta);
+        this.updateConveyorLogic(delta);
+    }
+
+    private updateConveyorLogic(delta: number) {
+        const gm = GameManager.getInstance();
+        if (!gm.conveyorUnlocked || !gm.conveyorActive) return;
+
+        // 1. Scroll Visuals
+        if (this.conveyorStripeGraphics) {
+            this.conveyorStripeOffset += delta * 0.1; // Speed
+            const { width } = this.scale;
+            this.conveyorStripeGraphics.clear();
+            this.conveyorStripeGraphics.lineStyle(2, 0x2c3e50, 1);
+            for (let x = -30; x < width + 30; x += 30) {
+                const drawX = x + (this.conveyorStripeOffset % 30);
+                this.conveyorStripeGraphics.moveTo(drawX, 0);
+                this.conveyorStripeGraphics.lineTo(drawX + 10, 40);
+            }
+            this.conveyorStripeGraphics.strokePath();
+        }
+
+        // 2. Apply Physical Force & Check Shipping
+        const bodies = this.matter.world.getAllBodies();
+        const { width, height } = this.scale;
+        const beltY = height - 20;
+
+        bodies.forEach((b: any) => {
+            if (b.gameObject && b.gameObject instanceof Trash && !b.isStatic && !b.gameObject.isDestroyed) {
+                const trash = b.gameObject as Trash;
+
+                // Guaranteed Shipping Check: If on right edge area of the belt
+                if (trash.x > width - 70 && trash.y > height - 100) {
+                    this.shipTrash(trash);
+                    return;
+                }
+
+                // Apply belt force
+                if (Math.abs(trash.y - beltY) < 60) {
+                    this.matter.body.applyForce(b, b.position, { x: 0.003, y: 0 }); // Constant push to right
+                }
+            }
+        });
     }
 
     private passiveTimer: number = 0;
@@ -945,7 +994,7 @@ export class MainScene extends Phaser.Scene {
 
     private createBlackHoleButton() {
         const { width } = this.scale;
-        // Position: Top Right row (y=10)
+        // Position: width - 280, y = 10 (Standard for BHole)
         this.blackHoleBtn = this.add.container(width - 280, 10);
 
         const btnWidth = 150;
@@ -953,17 +1002,17 @@ export class MainScene extends Phaser.Scene {
         const radius = 8;
 
         this.blackHoleBg = this.add.graphics();
-        this.blackHoleBg.fillStyle(0x555555, 1); // Start as OFF (grey)
+        this.blackHoleBg.fillStyle(0x555555, 1);
         this.blackHoleBg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
         this.blackHoleBg.lineStyle(2, 0xffffff, 0.5);
         this.blackHoleBg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
 
         const hitArea = this.add.rectangle(btnWidth / 2, btnHeight / 2, btnWidth, btnHeight, 0x000000, 0);
-
         hitArea.setInteractive({ useHandCursor: true });
+
         hitArea.on('pointerdown', () => {
             SoundManager.getInstance().play('click');
-            if (!this.blackHole.isStable()) {
+            if (this.blackHole && !this.blackHole.isStable()) {
                 this.blackHole.triggerBigBang();
             } else {
                 this.blackHole.toggle();
@@ -971,23 +1020,13 @@ export class MainScene extends Phaser.Scene {
             this.updateBlackHoleButton();
         });
 
-        // Hover effect
-        hitArea.on('pointerover', () => this.tweens.add({ targets: this.blackHoleBg, alpha: 0.8, duration: 100 }));
-        hitArea.on('pointerout', () => this.tweens.add({ targets: this.blackHoleBg, alpha: 1.0, duration: 100 }));
-
         this.blackHoleText = this.add.text(btnWidth / 2, btnHeight / 2, 'B.HOLE OFF', {
             ...Theme.styles.buttonText,
             fontSize: '14px'
-        });
-        this.blackHoleText.setOrigin(0.5);
+        }).setOrigin(0.5);
 
         this.blackHoleBtn.add([this.blackHoleBg, this.blackHoleText, hitArea]);
         this.blackHoleBtn.setDepth(1000);
-        // Initial visibility check?
-        const gm = GameManager.getInstance();
-        if (!gm.getUpgrade('black_hole_unlock') || gm.getUpgrade('black_hole_unlock')?.level === 0) {
-            this.blackHoleBtn.setVisible(false);
-        }
     }
 
     private updateBlackHoleButton() {
@@ -1101,6 +1140,9 @@ export class MainScene extends Phaser.Scene {
     private laserTimer = 0;
     // private pressCooldown = 0;
 
+    // Conveyor Graphics Reference
+    private conveyorGraphics: (Phaser.GameObjects.Graphics | Phaser.GameObjects.Shape)[] = [];
+
     private checkAutoPress(_delta: number) {
         // Removed
     }
@@ -1193,10 +1235,179 @@ export class MainScene extends Phaser.Scene {
         }
     }
 
+    private updateFacilities() {
+        const gm = GameManager.getInstance();
+
+        // 1. Drone Toggle
+        if (gm.droneUnlocked && !this.droneToggleBtn) {
+            this.createDroneToggleButton();
+        }
+
+        // 2. Conveyor Toggle & Belt
+        if (gm.conveyorUnlocked) {
+            if (!this.conveyorToggleBtn) this.createConveyorToggleButton();
+            if (!this.conveyorBelt) this.createConveyorBelt();
+        }
+
+        // 3. Refinery Link
+        if (gm.conveyorUnlocked && !this.refineryBtn) {
+            this.createRefineryButton();
+        }
+
+        // 4. Black Hole Button
+        if (gm.getUpgrade('black_hole_unlock') && gm.getUpgrade('black_hole_unlock')!.level > 0 && !this.blackHoleBtn) {
+            this.createBlackHoleButton();
+        }
+    }
+
+    private createDroneToggleButton() {
+        const gm = GameManager.getInstance();
+        const { width } = this.scale;
+
+        // Position: width - 410, y=10
+        this.droneToggleBtn = this.add.container(width - 410, 10).setDepth(2000);
+
+        const bg = this.add.rectangle(0, 0, 120, 40, gm.dronesActive ? 0x27ae60 : 0xc0392b, 0.8)
+            .setInteractive({ useHandCursor: true }).setOrigin(0);
+
+        const label = this.add.text(60, 20, gm.dronesActive ? "DRONE: ON" : "DRONE: OFF", {
+            fontSize: '14px',
+            fontFamily: 'Orbitron',
+            color: '#fff'
+        }).setOrigin(0.5);
+
+        this.droneToggleBtn.add([bg, label]);
+
+        bg.on('pointerdown', () => {
+            gm.dronesActive = !gm.dronesActive;
+            label.setText(gm.dronesActive ? "DRONE: ON" : "DRONE: OFF");
+            bg.setFillStyle(gm.dronesActive ? 0x27ae60 : 0xc0392b, 0.8);
+            SoundManager.getInstance().play('click');
+        });
+    }
+
+    private createConveyorToggleButton() {
+        const gm = GameManager.getInstance();
+        const { width } = this.scale;
+
+        // Position: width - 540, y=10
+        this.conveyorToggleBtn = this.add.container(width - 540, 10).setDepth(2000);
+
+        const bg = this.add.rectangle(0, 0, 120, 40, gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, 0.8)
+            .setInteractive({ useHandCursor: true }).setOrigin(0);
+
+        const label = this.add.text(60, 20, gm.conveyorActive ? "BELT: ON" : "BELT: OFF", {
+            fontSize: '14px',
+            fontFamily: 'Orbitron',
+            color: '#fff'
+        }).setOrigin(0.5);
+
+        this.conveyorToggleBtn.add([bg, label]);
+
+        bg.on('pointerdown', () => {
+            gm.conveyorActive = !gm.conveyorActive;
+            label.setText(gm.conveyorActive ? "BELT: ON" : "BELT: OFF");
+            bg.setFillStyle(gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, 0.8);
+            SoundManager.getInstance().play('click');
+
+            // Toggle Graphics
+            this.conveyorGraphics.forEach(g => g.setVisible(gm.conveyorActive));
+
+            // Toggle Audio
+            if (gm.conveyorActive) {
+                SoundManager.getInstance().startLoop('conveyor', 'conveyor');
+            } else {
+                SoundManager.getInstance().stopLoop('conveyor');
+            }
+        });
+    }
+
+    private createRefineryButton() {
+        const { width } = this.scale;
+        // Position: width - 670, y=10
+        this.refineryBtn = this.add.container(width - 670, 10).setDepth(2000);
+
+        const bg = this.add.rectangle(0, 0, 120, 40, 0x00d2d3, 0.8)
+            .setInteractive({ useHandCursor: true }).setOrigin(0);
+
+        const label = this.add.text(60, 20, "精製所へ", {
+            fontSize: '14px',
+            fontFamily: 'Noto Sans JP',
+            color: '#fff'
+        }).setOrigin(0.5);
+
+        this.refineryBtn.add([bg, label]);
+
+        bg.on('pointerdown', () => {
+            SoundManager.getInstance().play('click');
+            this.scene.pause(this);
+            this.scene.launch('RefineryScene');
+        });
+    }
+
+    private createConveyorBelt() {
+        const gm = GameManager.getInstance();
+        if (!gm.conveyorUnlocked) return;
+
+        const { width, height } = this.scale;
+
+        // 1. Belt Background
+        this.conveyorBelt = this.add.rectangle(width / 2, height - 20, width, 40, 0x34495e).setOrigin(0.5);
+        this.conveyorBelt.setDepth(5);
+
+        // 2. Scrolling Stripes
+        this.conveyorStripeGraphics = this.add.graphics({ x: 0, y: height - 40 });
+        this.conveyorStripeGraphics.setDepth(6);
+
+        // 3. Shipping Port Visual (A dark hatch at the right end)
+        const hatchBg = this.add.rectangle(width - 40, height - 20, 80, 50, 0x1a1a1a).setDepth(7);
+        const hatchFrame = this.add.graphics();
+        hatchFrame.lineStyle(4, 0x00d2d3, 0.8);
+        hatchFrame.strokeRect(width - 80, height - 45, 80, 50);
+        hatchFrame.setDepth(8);
+
+        // Track graphics for visibility toggling
+        this.conveyorGraphics = [this.conveyorBelt, this.conveyorStripeGraphics, hatchBg, hatchFrame];
+
+        // Apply initial state
+        this.conveyorGraphics.forEach(g => g.setVisible(gm.conveyorActive));
+
+        // No more physical sensor - using reliable X-coord check in updateConveyorLogic
+    }
+
+    private shipTrash(trash: Trash) {
+        if (trash.isDestroyed) return;
+        trash.isDestroyed = true; // Mark immediately
+
+        const gm = GameManager.getInstance();
+        const type = trash.trashType === 'bio' ? 'bioCell' : trash.trashType;
+        gm.shippedTrashBuffer.push({ type, x: trash.x });
+
+        // Instant visual feedback
+        new FloatingText(this, trash.x, trash.y, "SHIPPED!", "#00d2d3");
+
+        // Animate suck into hatch
+        this.tweens.add({
+            targets: trash,
+            x: this.scale.width - 20,
+            y: this.scale.height - 20,
+            scale: 0,
+            alpha: 0,
+            rotation: 5,
+            duration: 250,
+            onComplete: () => {
+                trash.destroy();
+            }
+        });
+
+        // Disable physics so it doesn't bounce or trigger more collisions
+        this.matter.body.setStatic(trash.body as MatterJS.BodyType, true);
+        trash.setVisible(true); // Ensure visible during tween
+    }
     private createLaserButton() {
         const { width } = this.scale;
-        // Position: Top Right row, next to black hole button (y=10)
-        this.laserBtn = this.add.container(width - 120, 10);
+        // Position: width - 130, y=10
+        this.laserBtn = this.add.container(width - 130, 10);
 
         const btnWidth = 120;
         const btnHeight = 40;
@@ -1209,7 +1420,7 @@ export class MainScene extends Phaser.Scene {
         bg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
 
         const hitArea = this.add.rectangle(btnWidth / 2, btnHeight / 2, btnWidth, btnHeight, 0x000000, 0);
-        hitArea.setInteractive({ useHandCursor: true });
+        hitArea.setInteractive({ useHandCursor: true }).setOrigin(0.5);
 
         const text = this.add.text(btnWidth / 2, btnHeight / 2, this.laserGridEnabled ? 'LASER ON' : 'LASER OFF', {
             ...Theme.styles.buttonText,
@@ -1506,200 +1717,156 @@ export class MainScene extends Phaser.Scene {
         new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "AUTO-BOT DEPLOYED!", "#00ffff");
     }
     // === CHAIN LIGHTNING ===
-    // Automatically targets up to 10 trash and chains between them
+    // Recursive Branching Lightning
     private chainLightning() {
         const trashGroup = this.children.getAll().filter(child =>
             child instanceof Trash && !(child as Trash).isDestroyed
         ) as Trash[];
 
-        if (trashGroup.length === 0) {
-            new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "対象なし！", "#ff0000");
-            return;
-        }
+        if (trashGroup.length === 0) return;
 
-        // Start from a random trash
         const startTrash = trashGroup[Math.floor(Math.random() * trashGroup.length)];
-        const chainTargets: Trash[] = [startTrash];
-        const maxChain = Math.min(10, trashGroup.length);
-        const chainRange = 250;
+        const affected: Trash[] = [];
+        const graphics = this.add.graphics().setDepth(5000);
 
-        // Build chain
-        for (let i = 0; i < maxChain - 1; i++) {
-            const last = chainTargets[chainTargets.length - 1];
-            let nextTarget: Trash | null = null;
-            let nextDist = Infinity;
+        const branch = (source: { x: number, y: number }, depth: number, maxDepth: number) => {
+            if (depth >= maxDepth) return;
 
-            for (const t of trashGroup) {
-                if (chainTargets.includes(t) || t.isDestroyed) continue;
-                const dist = Phaser.Math.Distance.Between(last.x, last.y, t.x, t.y);
-                if (dist < nextDist && dist < chainRange) {
-                    nextDist = dist;
-                    nextTarget = t;
-                }
-            }
+            // Find nearest un-affected targets
+            const targets = trashGroup
+                .filter(t => !affected.includes(t) && !t.isDestroyed)
+                .sort((a, b) => Phaser.Math.Distance.Between(source.x, source.y, a.x, a.y) -
+                    Phaser.Math.Distance.Between(source.x, source.y, b.x, b.y))
+                .slice(0, depth === 0 ? 3 : 2); // Branch factor
 
-            if (nextTarget) chainTargets.push(nextTarget);
-            else break;
-        }
+            targets.forEach(t => {
+                affected.push(t);
 
-        // Draw lightning
-        const graphics = this.add.graphics();
-        graphics.lineStyle(5, 0x00ffff, 1);
+                // Draw bolt
+                graphics.lineStyle(6 - depth * 1.5, 0x00ffff, 1);
+                graphics.beginPath();
+                graphics.moveTo(source.x, source.y);
+                graphics.lineTo(t.x, t.y);
+                graphics.strokePath();
 
-        for (let i = 0; i < chainTargets.length; i++) {
-            const target = chainTargets[i];
-            const prevX = i === 0 ? target.x : chainTargets[i - 1].x;
-            const prevY = i === 0 ? target.y - 60 : chainTargets[i - 1].y;
+                // Recurse
+                this.time.delayedCall(100, () => branch(t, depth + 1, maxDepth));
 
-            graphics.beginPath();
-            graphics.moveTo(prevX, prevY);
-            graphics.lineTo(target.x, target.y);
-            graphics.strokePath();
-        }
-
-        // Destroy with delay to prevent physics freeze
-        chainTargets.forEach((target, idx) => {
-            this.time.delayedCall(idx * 50, () => {
-                if (!target.isDestroyed) {
-                    target.destroyTrash(true);
-                }
+                // Destroy with shock effect
+                this.time.delayedCall(200 + depth * 100, () => {
+                    if (!t.isDestroyed) {
+                        this.createExplosion(t.x, t.y);
+                        t.destroyTrash(true);
+                    }
+                });
             });
-        });
+        };
 
-        this.cameras.main.shake(100, 0.01);
+        branch({ x: startTrash.x, y: startTrash.y - 1000 }, 0, 3);
+
+        this.cameras.main.shake(300, 0.01);
         this.tweens.add({
             targets: graphics,
             alpha: 0,
-            duration: 400,
+            duration: 800,
             onComplete: () => graphics.destroy()
         });
 
-        new FloatingText(this, this.scale.width / 2, this.scale.height / 2,
-            `⚡ CHAIN x${chainTargets.length}!`, "#00ffff");
+        new FloatingText(this, startTrash.x, startTrash.y - 50, "⚡ ION STORM!", "#00ffff");
         SoundManager.getInstance().play('click');
     }
 
     // === GRAVITY LASSO ===
-    // Destroys all trash on screen with a vortex effect
+    // Sucks all on-screen trash to center and crunches
     private activateGravityLasso() {
         const trashGroup = this.children.getAll().filter(child =>
             child instanceof Trash && !(child as Trash).isDestroyed
         ) as Trash[];
 
-        if (trashGroup.length === 0) {
-            new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "対象なし！", "#ff0000");
-            return;
-        }
+        if (trashGroup.length === 0) return;
 
         const { width, height } = this.scale;
         const centerX = width / 2;
         const centerY = height / 2;
 
-        // Visual vortex
-        const vortex = this.add.graphics();
-        vortex.lineStyle(6, 0xff00ff, 0.8);
-        vortex.beginPath();
-        vortex.arc(centerX, centerY, 100, 0, Math.PI * 2);
-        vortex.strokePath();
+        const graphics = this.add.graphics().setDepth(5000);
+        new FloatingText(this, centerX, centerY - 100, "🪢 EVENT HORIZON!", "#ff00ff");
 
-        new FloatingText(this, centerX, centerY - 50, "🪢 GRAVITY LASSO!", "#ff00ff");
+        trashGroup.forEach(t => {
+            if (t.isDestroyed) return;
 
-        // Destroy all trash with staggered timing
-        const count = Math.min(trashGroup.length, 20); // Limit to 20 to prevent freeze
-        for (let i = 0; i < count; i++) {
-            const t = trashGroup[i];
-            this.time.delayedCall(i * 40, () => {
-                if (!t.isDestroyed) {
-                    this.createExplosion(t.x, t.y);
+            // Draw tether line
+            graphics.lineStyle(2, 0xff00ff, 0.5);
+            graphics.lineBetween(centerX, centerY, t.x, t.y);
+
+            // Physics pull
+            const angle = Phaser.Math.Angle.Between(t.x, t.y, centerX, centerY);
+            t.setVelocity(Math.cos(angle) * 30, Math.sin(angle) * 30);
+
+            // Delayed collapse
+            this.time.delayedCall(1500, () => {
+                if (!t.isDestroyed && Phaser.Math.Distance.Between(t.x, t.y, centerX, centerY) < 300) {
                     t.destroyTrash(true);
                 }
             });
-        }
-
-        // Cleanup vortex
-        this.time.delayedCall(count * 40 + 200, () => {
-            this.tweens.add({
-                targets: vortex,
-                alpha: 0,
-                duration: 300,
-                onComplete: () => vortex.destroy()
-            });
         });
 
-        this.cameras.main.shake(150, 0.015);
+        this.time.delayedCall(1500, () => {
+            this.createExplosion(centerX, centerY);
+            this.cameras.main.shake(400, 0.03);
+            graphics.destroy();
+        });
+
         SoundManager.getInstance().play('click');
     }
 
-    // === QUANTUM SLING ===
-    // Destroys multiple trash in a line with explosion
+    // === QUANTUM SWING (Ex Sling) ===
+    // Marks targets then collapses them in space
     private activateQuantumSling() {
         const trashGroup = this.children.getAll().filter(child =>
             child instanceof Trash && !(child as Trash).isDestroyed
         ) as Trash[];
 
-        if (trashGroup.length === 0) {
-            new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "対象なし！", "#ff0000");
-            return;
-        }
+        if (trashGroup.length === 0) return;
 
-        // Random starting point
-        const startTrash = trashGroup[Math.floor(Math.random() * trashGroup.length)];
-        const startX = startTrash.x;
-        const startY = startTrash.y;
+        const max = Math.min(15, trashGroup.length);
+        const targets = Phaser.Utils.Array.Shuffle(trashGroup).slice(0, max);
 
-        // Random direction
-        const angle = Math.random() * Math.PI * 2;
-        const endX = startX + Math.cos(angle) * 600;
-        const endY = startY + Math.sin(angle) * 600;
+        new FloatingText(this, this.scale.width / 2, this.scale.height / 2, "🌀 QUANTUM SWING!", "#a29bfe");
 
-        // Visual line
-        const slingLine = this.add.graphics();
-        slingLine.lineStyle(6, 0x9b59b6, 1);
-        slingLine.beginPath();
-        slingLine.moveTo(startX, startY);
-        slingLine.lineTo(endX, endY);
-        slingLine.strokePath();
+        targets.forEach((t, i) => {
+            // Draw marker
+            this.time.delayedCall(i * 50, () => {
+                if (t.isDestroyed) return;
+                const circle = this.add.circle(t.x, t.y, 40, 0x00d2d3, 0.3).setDepth(4999);
+                this.tweens.add({
+                    targets: circle,
+                    scale: 1.5,
+                    alpha: 0,
+                    duration: 1000,
+                    onComplete: () => circle.destroy()
+                });
+            });
 
-        new FloatingText(this, startX, startY - 30, "🚀 QUANTUM SLING!", "#9b59b6");
-
-        // Destroy trash along the line
-        const destroyed: Trash[] = [];
-        for (const t of trashGroup) {
-            if (t.isDestroyed) continue;
-
-            // Check if trash is close to the line
-            const distToLine = Phaser.Math.Distance.BetweenPointsSquared(
-                { x: t.x, y: t.y },
-                Phaser.Geom.Line.GetNearestPoint(
-                    new Phaser.Geom.Line(startX, startY, endX, endY),
-                    new Phaser.Geom.Point(t.x, t.y)
-                )
-            );
-
-            if (distToLine < 10000) { // Within ~100px of line
-                destroyed.push(t);
-            }
-        }
-
-        // Destroy with staggered timing
-        destroyed.forEach((t, idx) => {
-            this.time.delayedCall(idx * 30, () => {
+            // Collapse after delay
+            this.time.delayedCall(1200, () => {
                 if (!t.isDestroyed) {
-                    this.createExplosion(t.x, t.y);
-                    t.destroyTrash(true);
+                    const rift = this.add.star(t.x, t.y, 5, 10, 30, 0x00d2d3).setDepth(5001);
+                    this.tweens.add({
+                        targets: rift,
+                        rotation: Math.PI,
+                        scale: 0,
+                        duration: 300,
+                        onComplete: () => {
+                            rift.destroy();
+                            t.destroyTrash(true);
+                        }
+                    });
                 }
             });
         });
 
-        // Cleanup line
-        this.tweens.add({
-            targets: slingLine,
-            alpha: 0,
-            duration: 500,
-            onComplete: () => slingLine.destroy()
-        });
-
-        this.cameras.main.shake(100, 0.01);
+        this.cameras.main.shake(200, 0.02);
         SoundManager.getInstance().play('click');
     }
 }

@@ -47,25 +47,79 @@ export class SoundManager {
         }
     }
 
-    public startLoop(id: string, type: 'vacuum') {
+    public startLoop(id: string, type: 'vacuum' | 'conveyor' | 'lava' | 'shredder' | 'blackhole_suck') {
         if (!this.enabled || !this.ctx || this.loops.has(id)) return;
 
         if (this.ctx.state === 'suspended') this.ctx.resume();
 
         const gain = this.ctx.createGain();
         gain.gain.setValueAtTime(0, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.1); // Fade in
+        const fadeTime = 0.5; // Smoother fade
+        gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + fadeTime);
 
         const osc = this.ctx.createOscillator();
         const noiseS = this.createNoiseSource();
 
+        // Common filter for noise
+        const filter = this.ctx.createBiquadFilter();
+        noiseS.connect(filter);
+
         if (type === 'vacuum') {
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + fadeTime);
+        }
+        else if (type === 'conveyor') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(50, this.ctx.currentTime); // Low rumble
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(200, this.ctx.currentTime); // Muffled mechanical noise
+            gain.gain.linearRampToValueAtTime(0.03, this.ctx.currentTime + fadeTime); // Quiet
+        }
+        else if (type === 'lava') {
+            osc.frequency.setValueAtTime(0, this.ctx.currentTime); // No tone, just noise
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(150, this.ctx.currentTime); // Deep rumble/hiss
+            filter.Q.value = 5; // Resonant bubbling?
+            gain.gain.linearRampToValueAtTime(0.08, this.ctx.currentTime + fadeTime);
+        }
+        else if (type === 'shredder') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(40, this.ctx.currentTime); // Grinding
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1000, this.ctx.currentTime); // Metallic scrap
+            gain.gain.linearRampToValueAtTime(0.06, this.ctx.currentTime + fadeTime);
+
+            // LFO for grinding variation
+            const lfo = this.ctx.createOscillator();
+            lfo.frequency.value = 8; // 8Hz mod
+            const lfoGain = this.ctx.createGain();
+            lfoGain.gain.value = 200;
+            lfo.connect(lfoGain);
+            lfoGain.connect(filter.frequency);
+            lfo.start();
+        }
+        else if (type === 'blackhole_suck') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(50, this.ctx.currentTime); // Deep hum
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(100, this.ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.15, this.ctx.currentTime + fadeTime); // Louder internal hum
+
+            // LFO for throbbing
+            const lfo = this.ctx.createOscillator();
+            lfo.frequency.value = 0.5; // Slow throb
+            const lfoGain = this.ctx.createGain();
+            lfoGain.gain.value = 20; // Pitch bend amount
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfo.start();
         }
 
         osc.connect(gain);
-        noiseS.connect(gain);
+        filter.connect(gain); // Connect filtered noise
         gain.connect(this.ctx.destination);
 
         osc.start();
@@ -90,6 +144,46 @@ export class SoundManager {
             }, 100);
             this.loops.delete(id);
         }
+    }
+
+    public playBigBang() {
+        if (!this.enabled || !this.ctx) return;
+        const t = this.ctx.currentTime;
+
+        // 1. Deep Boom (Sine Sweep)
+        const osc = this.ctx.createOscillator();
+        const oscGain = this.ctx.createGain();
+        osc.connect(oscGain);
+        oscGain.connect(this.ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.exponentialRampToValueAtTime(10, t + 2.0); // Drop pitch
+
+        oscGain.gain.setValueAtTime(0.8, t);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, t + 2.5);
+
+        osc.start(t);
+        osc.stop(t + 3.0);
+
+        // 2. Explosion Noise
+        const noise = this.createNoiseSource();
+        const noiseFilter = this.ctx.createBiquadFilter();
+        const noiseGain = this.ctx.createGain();
+
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(1000, t);
+        noiseFilter.frequency.exponentialRampToValueAtTime(100, t + 1.0); // Muffle over time
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(this.ctx.destination);
+
+        noiseGain.gain.setValueAtTime(0.5, t);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
+
+        noise.start(t);
+        noise.stop(t + 2.0);
     }
 
     private createNoiseSource(): AudioBufferSourceNode {

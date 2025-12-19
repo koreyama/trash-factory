@@ -9,11 +9,12 @@ export class SkillTreeScene extends Phaser.Scene {
     private lastPtrX: number = 0;
     private lastPtrY: number = 0;
 
+    private resourceUIContainer!: Phaser.GameObjects.Container;
+    private resourceUIMap: Map<string, { bg: Phaser.GameObjects.Graphics, text: Phaser.GameObjects.Text }> = new Map();
     private tooltipUI!: Phaser.GameObjects.Container;
     private nodeVisuals: Map<string, Phaser.GameObjects.Container> = new Map();
     private lineGraphics!: Phaser.GameObjects.Graphics;
 
-    private moneyLabel!: Phaser.GameObjects.Text;
     private cursorDot!: Phaser.GameObjects.Arc;
 
     constructor() {
@@ -119,13 +120,7 @@ export class SkillTreeScene extends Phaser.Scene {
                 this.scene.resume('MainScene');
             });
 
-        this.moneyLabel = this.add.text(width - 30, 50, '', {
-            fontFamily: '"Noto Sans JP", sans-serif',
-            fontSize: '24px',
-            color: Theme.colors.text,
-            align: 'right'
-        }).setOrigin(1, 0).setScrollFactor(0);
-
+        this.createResourceUI();
         this.updateHUD();
         this.createTooltipUI();
 
@@ -135,9 +130,66 @@ export class SkillTreeScene extends Phaser.Scene {
         this.cursorDot.setScrollFactor(0);
     }
 
+    private createResourceUI() {
+        const { width } = this.scale;
+        this.resourceUIContainer = this.add.container(width - 20, 20).setScrollFactor(0);
+
+        const resources = [
+            { key: 'money', label: '資金', color: '#ffd700', icon: 'trash-circle' },
+            { key: 'plastic', label: 'プラ', color: '#3498db', icon: 'trash-plastic' },
+            { key: 'metal', label: '金属', color: '#95a5a6', icon: 'trash-metal' },
+            { key: 'circuit', label: '基板', color: '#2ecc71', icon: 'trash-circuit' },
+            { key: 'bioCell', label: 'バイオ', color: '#9b59b6', icon: 'trash-bio' },
+            { key: 'rareMetal', label: 'レアM', color: '#f1c40f', icon: 'trash-battery' },
+            { key: 'radioactive', label: '放射能', color: '#27ae60', icon: 'trash-nuclear' },
+            { key: 'darkMatter', label: 'DM', color: '#a29bfe', icon: 'trash-satellite' },
+            { key: 'quantumCrystal', label: 'QC', color: '#00d2d3', icon: 'trash-quantum' }
+        ];
+
+        const pillWidth = 160;
+        const pillHeight = 40;
+        const spacingX = 170;
+        const spacingY = 50;
+
+        resources.forEach((res, i) => {
+            const col = i % 3;
+            const row = Math.floor(i / 3);
+            const x = -(col + 1) * spacingX + 150;
+            const y = row * spacingY;
+
+            const bg = this.add.graphics();
+            bg.fillStyle(0x000000, 0.6);
+            bg.fillRoundedRect(x - pillWidth + 10, y, pillWidth, pillHeight, 20);
+            bg.lineStyle(2, Phaser.Display.Color.HexStringToColor(res.color).color, 0.8);
+            bg.strokeRoundedRect(x - pillWidth + 10, y, pillWidth, pillHeight, 20);
+
+            const icon = this.add.image(x - pillWidth + 30, y + pillHeight / 2, res.icon).setScale(0.4);
+
+            const text = this.add.text(x - pillWidth + 50, y + pillHeight / 2, '0', {
+                fontFamily: '"Roboto Mono", monospace',
+                fontSize: '18px',
+                color: '#ffffff',
+                fontStyle: 'bold'
+            }).setOrigin(0, 0.5);
+
+            this.resourceUIContainer.add([bg, icon, text]);
+            this.resourceUIMap.set(res.key, { bg, text });
+        });
+    }
+
     private updateHUD() {
         const gm = GameManager.getInstance();
-        this.moneyLabel.setText(`¥${gm.getMoney().toLocaleString()} | プラ: ${gm.plastic} | 金属: ${gm.metal}`);
+        this.resourceUIMap.forEach((obj, key) => {
+            let val = 0;
+            if (key === 'money') val = gm.getMoney();
+            else val = (gm as any)[key] || 0;
+
+            if (key === 'money') {
+                obj.text.setText(`¥${val.toLocaleString()}`);
+            } else {
+                obj.text.setText(val.toLocaleString());
+            }
+        });
     }
 
     private createNode(upgrade: any, x: number, y: number): Phaser.GameObjects.Container {

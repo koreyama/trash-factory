@@ -8,6 +8,7 @@ import { AchievementScene } from './scenes/AchievementScene';
 import { CraftingScene } from './scenes/CraftingScene';
 import { StageSelectScene } from './scenes/StageSelectScene';
 import { RoguelikeScene } from './scenes/RoguelikeScene';
+import { RefineryScene } from './scenes/RefineryScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.WEBGL, // Force WebGL for GPU acceleration (was AUTO)
@@ -27,18 +28,19 @@ const config: Phaser.Types.Core.GameConfig = {
       constraintIterations: 1, // Default is 2
     }
   },
-  scene: [TitleScene, MainScene, SkillTreeScene, AchievementScene, CraftingScene, SettingsScene, StageSelectScene, RoguelikeScene],
+  scene: [TitleScene, MainScene, SkillTreeScene, AchievementScene, CraftingScene, SettingsScene, StageSelectScene, RoguelikeScene, RefineryScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
   // GPU Performance Optimizations
   render: {
-    antialias: false, // Disable antialiasing for better performance
+    antialias: true, // Enable antialiasing for smoother text/edges
     pixelArt: false,
-    roundPixels: true, // Avoid sub-pixel rendering
-    powerPreference: 'high-performance', // Request high-performance GPU
-    batchSize: 4096, // Increase batch size for fewer draw calls
+    roundPixels: false, // Turn off roundPixels for smoother text rendering at high DPR
+    resolution: window.devicePixelRatio || 1, // Use device pixel ratio for crispness
+    powerPreference: 'high-performance',
+    batchSize: 4096,
     maxLights: 10
   },
   fps: {

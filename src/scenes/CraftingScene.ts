@@ -57,9 +57,9 @@ export class CraftingScene extends Phaser.Scene {
         },
         {
             id: 'quantum_sling',
-            name: '量子スリング',
+            name: '量子スイング',
             icon: 'gadget-sling',
-            desc: 'ゴミを引っ張って発射、連鎖爆発',
+            desc: '広範囲を量子化し、一括で崩壊させる',
             cost: [{ type: 'quantumCrystal', amount: 15 }, { type: 'darkMatter', amount: 20 }]
         }
     ];
@@ -124,23 +124,60 @@ export class CraftingScene extends Phaser.Scene {
             this.resourceTextRefs[key] = txt;
         };
 
+        const createResRow2 = (idx: number, label: string, color: string, key: string, value: number, yPos: number) => {
+            const x = startX + idx * spacing;
+            const txt = this.add.text(x, yPos, `${label}\n${value.toLocaleString()}`, {
+                fontFamily: '"Orbitron", monospace',
+                fontSize: '18px',
+                color: color,
+                align: 'center',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            this.resourceTextRefs[key] = txt;
+        };
+
         createRes(0, 'プラスチック', '#3498db', 'plastic', gm.plastic);
         createRes(1, '金属', '#95a5a6', 'metal', gm.metal);
         createRes(2, '電子基板', '#2ecc71', 'circuit', gm.circuit);
         createRes(3, 'バイオ細胞', '#9b59b6', 'bioCell', gm.bioCell);
+
+        // Row 2
+        const y2 = 190;
+        createResRow2(0, 'レアメタル', '#e67e22', 'rareMetal', gm.rareMetal, y2);
+        createResRow2(1, '放射性物質', '#f1c40f', 'radioactive', gm.radioactive, y2);
+        createResRow2(2, 'ダークマター', '#a29bfe', 'darkMatter', gm.darkMatter, y2);
+        createResRow2(3, '量子結晶', '#00d2d3', 'quantumCrystal', gm.quantumCrystal, y2);
     }
 
     private updateResources() {
         const gm = GameManager.getInstance();
-        if (this.resourceTextRefs['plastic']) this.resourceTextRefs['plastic'].setText(gm.plastic.toLocaleString());
-        if (this.resourceTextRefs['metal']) this.resourceTextRefs['metal'].setText(gm.metal.toLocaleString());
-        if (this.resourceTextRefs['circuit']) this.resourceTextRefs['circuit'].setText(gm.circuit.toLocaleString());
-        if (this.resourceTextRefs['bioCell']) this.resourceTextRefs['bioCell'].setText(gm.bioCell.toLocaleString());
+        const keys = ['plastic', 'metal', 'circuit', 'bioCell', 'rareMetal', 'radioactive', 'darkMatter', 'quantumCrystal'];
+        keys.forEach(k => {
+            if (this.resourceTextRefs[k]) {
+                const val = (gm as any)[k];
+                const label = this.getResLabel(k);
+                this.resourceTextRefs[k].setText(`${label}\n${val.toLocaleString()}`);
+            }
+        });
+    }
+
+    private getResLabel(key: string): string {
+        switch (key) {
+            case 'plastic': return 'プラスチック';
+            case 'metal': return '金属';
+            case 'circuit': return '電子基板';
+            case 'bioCell': return 'バイオ細胞';
+            case 'rareMetal': return 'レアメタル';
+            case 'radioactive': return '放射性物質';
+            case 'darkMatter': return 'ダークマター';
+            case 'quantumCrystal': return '量子結晶';
+            default: return key;
+        }
     }
 
 
     private createGadgetList(width: number) {
-        const startY = 230; // Moved further down (was 200, header+resources take up to ~150)
+        const startY = 270; // Moved further down for 2 rows of resources
         const itemHeight = 100;
 
         this.gadgetList.forEach((gadget, index) => {
@@ -186,9 +223,13 @@ export class CraftingScene extends Phaser.Scene {
             const finalAmount = Math.floor(c.amount * discount);
             let label = '';
             if (c.type === 'plastic') { label = 'プラ'; }
-            if (c.type === 'metal') { label = '金属'; }
-            if (c.type === 'circuit') { label = '基板'; }
-            if (c.type === 'bioCell') { label = 'バイオ'; }
+            else if (c.type === 'metal') { label = '金属'; }
+            else if (c.type === 'circuit') { label = '基板'; }
+            else if (c.type === 'bioCell') { label = 'バイオ'; }
+            else if (c.type === 'rareMetal') { label = 'レアM'; }
+            else if (c.type === 'radioactive') { label = '放射能'; }
+            else if (c.type === 'darkMatter') { label = 'DM'; }
+            else if (c.type === 'quantumCrystal') { label = 'QC'; }
             costText += `${label}:${finalAmount} `;
         });
 
@@ -233,10 +274,7 @@ export class CraftingScene extends Phaser.Scene {
 
         for (const c of gadget.cost) {
             const cost = Math.floor(c.amount * discount);
-            if (c.type === 'plastic' && gm.plastic < cost) canAfford = false;
-            if (c.type === 'metal' && gm.metal < cost) canAfford = false;
-            if (c.type === 'circuit' && gm.circuit < cost) canAfford = false;
-            if (c.type === 'bioCell' && gm.bioCell < cost) canAfford = false;
+            if ((gm as any)[c.type] < cost) canAfford = false;
         }
 
         if (canAfford) {
@@ -260,10 +298,7 @@ export class CraftingScene extends Phaser.Scene {
             const cost = Math.floor(c.amount * discount);
             finalCosts.push({ type: c.type, amount: cost });
 
-            if (c.type === 'plastic' && gm.plastic < cost) canAfford = false;
-            if (c.type === 'metal' && gm.metal < cost) canAfford = false;
-            if (c.type === 'circuit' && gm.circuit < cost) canAfford = false;
-            if (c.type === 'bioCell' && gm.bioCell < cost) canAfford = false;
+            if ((gm as any)[c.type] < cost) canAfford = false;
         }
 
         if (!canAfford) return;
