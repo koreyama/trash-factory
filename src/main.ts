@@ -34,7 +34,6 @@ const config: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
   // GPU Performance Optimizations
-  resolution: window.devicePixelRatio || 1, // Use device pixel ratio for crispness
   render: {
     antialias: true, // Enable antialiasing for smoother text/edges
     pixelArt: false,
