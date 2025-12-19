@@ -2100,7 +2100,7 @@ export class RoguelikeScene extends Phaser.Scene {
         this.cameras.main.shake(duration, intensity);
     }
 
-    updateTrashBounds(delta: number) {
+    updateTrashBounds(_delta: number) {
         const { width, height } = this.scale;
         const padding = 20;
 
