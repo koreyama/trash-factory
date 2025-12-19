@@ -113,30 +113,79 @@ export class RoguelikeScene extends Phaser.Scene {
             (this as any).hasExplode = data.hasExplode || false;
             (this as any).hasLifesteal = data.hasLifesteal || false;
             (this as any).expMult = data.expMult || 1.0;
+            // Cleanup sound on shutdown
+            this.events.on('shutdown', () => {
+                try { SoundManager.getInstance().stopLoop('player_vacuum'); } catch (e) { }
+            });
             (this as any).startLevel = data.startLevel || 1;
 
-            // Only skip reset if it's a true room transition (implied by having hp data?)
-            // Actually, if we are starting a stage, we DO want to reset player progression partially?
-            // No, we want a fresh start but at a specific room.
-            // If data.hp was missing, it's a new start. 
-            // The logic below triggers reset if (skipReset) is false.
-            // If we set skipReset = true, we MUST have fully valid state.
-            // If we come from Stage Select, we enter this block.
-            // We should arguably just set skipReset = true because we manually set the defaults above.
+            // Restore Tank (Ammo counts)
+            if (data.tank) {
+                this.tank = { ...this.tank, ...data.tank };
+            }
+
+            // ONLY call resetPlayerProgression if we are NOT in a room transition
+            // Wait, actually, if it IS a room transition, we still want to recalculate base stats from GM
+            // but we MUST NOT overwrite current session progress like HP or Level.
+            this.applyMetaUpgrades(data.revivalCount);
             (this as any).skipReset = true;
         } else {
             (this as any).skipReset = false;
-            // New Game Defaults
+            // Full Run Reset
             this.resetPlayerProgression();
         }
+    }
+
+    // New helper to apply GM meta-stats without resetting run state
+    applyMetaUpgrades(preservedRevival?: number) {
+        const gm = GameManager.getInstance();
+        const s = gm.rogueStats;
+
+        // Base Stat Modifiers from Meta-Upgrades
+        this.maxHp = 100 * (1.0 + s.maxHp * 0.1);
+        this.staminaRegen = 25 * (1.0 + s.cooldown * 0.05);
+        this.moveSpeed = 6 * (1.0 + s.moveSpeed * 0.05);
+        this.damageMult = 1.0 + (s.might * 0.1);
+        this.dropRateMult = 1.0 + (s.luck * 0.1);
+        (this as any).expMult = 1.0 + (s.growth * 0.03);
+        (this as any).armor = s.armor || 0;
+        // Recovery (+0.1 HP/s per level)
+        (this as any).recovery = (s.recovery || 0) * 0.1;
+
+        // Cooldown Reduction for attack speed
+        this.attackInterval = 200 * (1.0 - (s.cooldown || 0) * 0.05);
+
+        // Area / Magnet
+        const areaMult = 1.0 + (s.area * 0.1);
+        this.vacuumRange = 250 * areaMult + (s.magnet * 50);
+
+        // Speed (+10% Projectile Speed)
+        (this as any).projectileSpeedMult = 1.0 + ((s.speed || 0) * 0.1);
+
+        // Duration (+15% Duration)
+        (this as any).durationMult = 1.0 + ((s.duration || 0) * 0.15);
+
+        // Amount Bonus
+        (this as any).amountBonus = s.amount || 0;
+
+        // Revival
+        if (preservedRevival !== undefined) {
+            (this as any).revivalCount = preservedRevival;
+        } else {
+            (this as any).revivalCount = s.revival || 0;
+        }
+
+        console.log("Meta-Upgrades applied from GameManager:", s);
     }
 
     create() {
         const { width, height } = this.scale;
 
         try {
-            // Check for new game or restart
             this.resetSceneState();
+            // ALWAYS call resetPlayerProgression if we are starting a room for the first time in a RUN
+            // But if we are restarting scene (scene.restart), we might want to keep some stats.
+            // Actually, resetPlayerProgression pulls from GameManager, which is what we want for run start.
             if (!(this as any).skipReset) {
                 this.resetPlayerProgression();
             }
@@ -330,34 +379,22 @@ export class RoguelikeScene extends Phaser.Scene {
     }
 
     resetPlayerProgression() {
-        const gm = GameManager.getInstance();
-        const s = gm.rogueStats;
+        this.applyMetaUpgrades();
 
-        // Base Stats + Meta Upgrades
-        // Max HP (+10% per level)
-        this.maxHp = 100 * (1.0 + s.maxHp * 0.1);
+        // RUN START INITIALIZATION
         this.hp = this.maxHp;
-
-        // Cooldown Reduction (Standard: -2.5% per level, max 2 levels -> -5%... wait, VS has -5% per level usually?)
-        // Let's go with linear -2.5% for now. Map to stamina regen or actual cooldowns.
-        // Implementing 'cooldown' as a multiplier for regen for now:
-        this.staminaRegen = 25 * (1.0 + s.cooldown * 0.05);
-        this.maxStamina = 100;
         this.stamina = this.maxStamina;
-
         this.level = 1;
         this.exp = 0;
         this.expToNext = 100;
         this.kills = 0;
+        this.tank = { plastic: 0, metal: 0, bio: 0, max: 100 };
+        this.currentAmmo = 'plastic';
+        this.droneFireRateMult = 1.0;
 
-        // Might (+10% Damage per level)
-        this.damageMult = 1.0 + (s.might * 0.1);
+        (this as any).hasExplode = false;
+        (this as any).hasLifesteal = false;
 
-        // Armor (+1 Defense per level - simply reduce damage taken)
-        (this as any).armor = s.armor;
-
-        // Recovery (+0.1 HP/s per level)
-        (this as any).recovery = s.recovery * 0.1;
         // Start regen timer if not exists
         if (!(this as any).regenTimer) {
             (this as any).regenTimer = this.time.addEvent({
@@ -371,45 +408,6 @@ export class RoguelikeScene extends Phaser.Scene {
                 }
             });
         }
-
-        // Area (+10% Area per level) - affects vacuum range and explosions
-        const areaMult = 1.0 + (s.area * 0.1);
-        this.vacuumRange = 250 * areaMult;
-        this.vacuumForce = 0.0005;
-
-        // Speed (+10% Projectile Speed)
-        (this as any).projectileSpeedMult = 1.0 + (s.speed * 0.1);
-
-        // Duration (+15% Duration)
-        (this as any).durationMult = 1.0 + (s.duration * 0.15);
-
-        // Amount (+1 Amount)
-        (this as any).amountBonus = s.amount;
-
-        // Move Speed (+5% Move Speed)
-        this.moveSpeed = 6 * (1.0 + s.moveSpeed * 0.05);
-
-        // Magnet (+25% Range... already covered? Let's add extra to vacuum)
-        this.vacuumRange += (s.magnet * 50);
-
-        // Luck (+10% Luck)
-        this.dropRateMult = 1.0 + (s.luck * 0.1);
-
-        // Greed (+10% Gold Gain)
-        (this as any).greedMult = 1.0 + (s.greed * 0.1);
-
-        // Growth (+3% Exp Gain)
-        (this as any).expMult = 1.0 + (s.growth * 0.03);
-
-        // Revival
-        (this as any).revivalCount = s.revival;
-
-        this.tank = { plastic: 0, metal: 0, bio: 0, max: 100 };
-        this.currentAmmo = 'plastic';
-        this.droneFireRateMult = 1.0;
-
-        (this as any).hasExplode = false;
-        (this as any).hasLifesteal = false;
     }
 
     createHUD() {
@@ -661,6 +659,9 @@ export class RoguelikeScene extends Phaser.Scene {
 
             // 吸引処理
             if (this.isVacuuming) {
+                // Play persistent vacuum loop
+                try { SoundManager.getInstance().startLoop('player_vacuum', 'vacuum'); } catch (e) { }
+
                 const pointer = this.input.activePointer;
                 this.vacuumAngle = Phaser.Math.Angle.Between(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
 
@@ -700,12 +701,13 @@ export class RoguelikeScene extends Phaser.Scene {
                 });
             } else {
                 this.vacuumGraphics.clear();
+                try { SoundManager.getInstance().stopLoop('player_vacuum'); } catch (e) { }
             }
 
-            // リジェネ効果
-            const hpRegen = (this as any).hpRegen || 0;
-            if (hpRegen > 0 && this.hp < this.maxHp) {
-                this.hp = Math.min(this.hp + (hpRegen * delta) / 1000, this.maxHp);
+            // リジェネ効果 (applyMetaUpgradesで定義されたrecovery)
+            const rec = (this as any).recovery || 0;
+            if (rec > 0 && this.hp < this.maxHp && !this.gameOver) {
+                this.hp = Math.min(this.hp + (rec * delta) / 1000, this.maxHp);
             }
 
             // 磁力効果（敵を引き寄せ）
@@ -730,6 +732,12 @@ export class RoguelikeScene extends Phaser.Scene {
             } else if (this.isAttacking) {
             } else {
                 this.handleInput(delta);
+
+                // Continuous Fire Logic
+                const pointer = this.input.activePointer;
+                if (pointer.leftButtonDown()) {
+                    this.performAttack(pointer);
+                }
             }
 
             this.updateEnemies(time, delta);
@@ -750,17 +758,19 @@ export class RoguelikeScene extends Phaser.Scene {
             this.updateGUI();
 
             if (this.hp <= 0) {
-                // セカンドチャンス効果
-                if ((this as any).hasRevive) {
-                    (this as any).hasRevive = false;
-                    this.hp = 1;
+                try { SoundManager.getInstance().stopLoop('player_vacuum'); } catch (e) { }
+                const riv = (this as any).revivalCount || 0;
+                if (riv > 0) {
+                    (this as any).revivalCount = riv - 1;
+                    this.hp = this.maxHp * 0.5; // 50% HP Restoration
                     this.invulnerable = true;
                     this.player.setTint(0xffffff);
                     this.cameras.main.flash(500, 255, 255, 255);
-                    this.time.delayedCall(1000, () => {
+                    this.time.delayedCall(2000, () => {
                         this.invulnerable = false;
                         if (this.player && this.player.active) this.player.clearTint();
                     });
+                    console.log(`Revived! Remaining: ${(this as any).revivalCount}`);
                 } else {
                     this.gameOverSequence(false);
                 }
@@ -858,18 +868,28 @@ export class RoguelikeScene extends Phaser.Scene {
         }
 
         if (bulletType !== 'none') {
-            this.fireBullet(bulletType, angle);
+            const bonus = (this as any).amountBonus || 0;
+            const count = 1 + bonus;
+
+            for (let i = 0; i < count; i++) {
+                // 発射段数（Amount）に応じた扇状の射撃
+                const offset = (i - (count - 1) / 2) * 0.2; // 0.2 rad spread
+                this.fireBullet(bulletType, angle + offset);
+            }
         } else {
             this.performMeleeAttack(angle);
         }
     }
 
     fireBullet(type: string, angle: number, startX: number = this.player.x, startY: number = this.player.y) {
-        let speed = 15;
+        const speedMult = (this as any).projectileSpeedMult || 1.0;
+        const durationMult = (this as any).durationMult || 1.0;
+
+        let speed = 15 * speedMult;
         let damage = 20 * this.damageMult;
         let color = 0xffffff;
         let size = 10;
-        let range = 1000;
+        let range = 1000 * durationMult;
 
         if (type === 'plastic') {
             speed = 18;
@@ -882,14 +902,20 @@ export class RoguelikeScene extends Phaser.Scene {
             color = 0x95a5a6;
             size = 12;
         } else if (type === 'bio') {
-            speed = 14;
-            damage = 10 * this.damageMult;
+            speed = 14 * speedMult;
+            damage = 25 * this.damageMult; // Increased slightly for utility
             color = 0x2ecc71;
             size = 10;
         }
 
         const bullet = this.matter.add.circle(startX, startY, size, { isSensor: true, label: 'player_attack' });
-        (bullet as any).attackData = { damage: damage, knockback: 5, type: type };
+        (bullet as any).attackData = {
+            damage: damage,
+            knockback: type === 'metal' ? 2 : 5,
+            type: type,
+            isPiercing: type === 'metal',
+            isLifesteal: type === 'bio'
+        };
 
         const visual = this.add.circle(startX, startY, size, color);
         (bullet as any).gameObject = visual;
@@ -1194,7 +1220,21 @@ export class RoguelikeScene extends Phaser.Scene {
 
                 this.createHitEffect(hitX, hitY);
 
-                // ナイフなら消滅
+                // Lifesteal effect
+                if (attackData.isLifesteal) {
+                    const heal = Math.max(1, Math.floor(attackData.damage * 0.1));
+                    this.hp = Math.min(this.hp + heal, this.maxHp);
+                    this.createSparks(this.player.x, this.player.y, 0x2ecc71, 5);
+                }
+
+                // Piercing logic: only destroy if NOT piercing
+                if (attackBody.label === 'player_attack' && !attackData.isPiercing) {
+                    const visual = (attackBody as any).gameObject;
+                    if (visual && visual.active) visual.destroy();
+                    try { this.matter.world.remove(attackBody); } catch (e) { }
+                }
+
+                // Knife logic
                 if (attackBody.label === 'player_knife') {
                     const knife = (attackBody as any).gameObject;
                     if (knife && knife.active) knife.destroy();
@@ -1293,8 +1333,8 @@ export class RoguelikeScene extends Phaser.Scene {
     takeDamage(damage: number) {
         if (this.invulnerable || this.gameOver) return;
 
-        const reduction = (this as any).damageReduction || 0;
-        const actualDmg = Math.max(1, Math.floor(damage * (1 - reduction)));
+        const armor = (this as any).armor || 0;
+        const actualDmg = Math.max(1, Math.floor(damage - armor));
 
         this.hp -= actualDmg;
         this.shakeCamera(0.02, 200);
@@ -1338,7 +1378,7 @@ export class RoguelikeScene extends Phaser.Scene {
         }
 
         if (type === 'boss') {
-            this.gameOverSequence(true);
+            this.showClearRewardUI();
             if (enemyData.sprite && enemyData.sprite.active) enemyData.sprite.destroy();
             this.enemies = this.enemies.filter(e => e !== enemyData);
             return;
@@ -1562,10 +1602,12 @@ export class RoguelikeScene extends Phaser.Scene {
             vacuumForce: this.vacuumForce,
             droneFireRateMult: this.droneFireRateMult,
             dropRateMult: this.dropRateMult,
-            tank: this.tank,
+            tank: { ...this.tank }, // PASS TANK DATA
             hasExplode: (this as any).hasExplode,
             hasLifesteal: (this as any).hasLifesteal,
-            expMult: (this as any).expMult
+            expMult: (this as any).expMult,
+            startLevel: (this as any).startLevel,
+            revivalCount: (this as any).revivalCount
         };
 
 
@@ -1584,13 +1626,14 @@ export class RoguelikeScene extends Phaser.Scene {
         const { width, height } = this.scale;
 
         // Remove UI container
-        if (this.uiContainer) this.uiContainer.destroy();
+        if (this.uiContainer) this.uiContainer.add(this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8).setDepth(2000));
 
-        // Darken background
-        this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8).setDepth(2000);
+        // Disable physics
+        this.matter.world.pause();
+        this.gameOver = true;
 
         // Clear Text
-        this.add.text(width / 2, 100, "BOSS DEFEATED!", { // Keep English or use ボス撃破！
+        this.add.text(width / 2, 100, "BOSS DEFEATED!", {
             fontFamily: '"Orbitron"', fontSize: '64px', color: '#f1c40f', fontStyle: 'bold'
         }).setOrigin(0.5).setDepth(2001);
 
@@ -1598,11 +1641,14 @@ export class RoguelikeScene extends Phaser.Scene {
             fontFamily: '"Orbitron"', fontSize: '32px', color: '#ffffff'
         }).setOrigin(0.5).setDepth(2001);
 
-        // Reward Options
+        // Stage-based Scaling
+        const startLevel = (this as any).startLevel || 1;
+        const multiplier = Math.pow(1.5, startLevel - 1);
+
         const rewards = [
-            { name: "資源物資", desc: "次の周回で全素材+100で開始", color: 0x3498db },
-            { name: "経験値データ", desc: "次の周回をレベル5で開始", color: 0x9b59b6 },
-            { name: "システム拡張", desc: "「ラピッドファイア」モードを解放", color: 0xe74c3c }
+            { id: 'money', name: "資金調達", desc: `ゴールド +¥${(1000000 * multiplier).toLocaleString()}`, color: 0xf1c40f, amount: 1000000 * multiplier },
+            { id: 'resource', name: "資源物資", desc: `プラ +${Math.floor(5000 * multiplier)}, 金属 +${Math.floor(2500 * multiplier)}`, color: 0x3498db, plastic: 5000 * multiplier, metal: 2500 * multiplier },
+            { id: 'rare', name: "システム拡張", desc: `レアメタル +${Math.floor(500 * multiplier)}`, color: 0xe74c3c, rareMetal: 500 * multiplier }
         ];
 
         rewards.forEach((r, index) => {
@@ -1617,11 +1663,21 @@ export class RoguelikeScene extends Phaser.Scene {
             bg.on('pointerover', () => bg.setFillStyle(0x555555));
             bg.on('pointerout', () => bg.setFillStyle(0x333333));
             bg.on('pointerdown', () => {
-                // Return to Main Menu / Normal Game
-                console.log(`Selected reward: ${r.name}`);
+                const gm = GameManager.getInstance();
+                if (r.id === 'money') {
+                    gm.rogueGold += r.amount!;
+                } else if (r.id === 'resource') {
+                    gm.addResource('plastic', r.plastic!);
+                    gm.addResource('metal', r.metal!);
+                } else if (r.id === 'rare') {
+                    gm.addResource('rareMetal', r.rareMetal!);
+                }
+
+                gm.save();
+
                 this.cameras.main.fadeOut(1000, 0, 0, 0);
                 this.time.delayedCall(1000, () => {
-                    this.scene.start('MainScene'); // Return to title/hub
+                    this.scene.start('StageSelectScene'); // Return to Stage Select
                 });
             });
 

@@ -1,18 +1,7 @@
 import Phaser from 'phaser';
 import { GameManager } from '../managers/GameManager';
-import type { UpgradeCategory } from '../managers/GameManager';
-
 import { Theme } from '../managers/Theme';
 import { SoundManager } from '../managers/SoundManager';
-
-// Tab definitions
-const TABS: { category: UpgradeCategory; label: string; icon: string }[] = [
-    { category: 'processing', label: '処理', icon: '🗑️' },
-    { category: 'automation', label: '自動化', icon: '⚙️' },
-    { category: 'research', label: '研究', icon: '🔬' },
-    { category: 'space', label: '宇宙', icon: '🚀' },
-    { category: 'endgame', label: '終局', icon: '🌌' }
-];
 
 export class SkillTreeScene extends Phaser.Scene {
     private container!: Phaser.GameObjects.Container;
@@ -27,10 +16,6 @@ export class SkillTreeScene extends Phaser.Scene {
     private moneyLabel!: Phaser.GameObjects.Text;
     private cursorDot!: Phaser.GameObjects.Arc;
 
-    // Tab UI
-    private currentCategory: UpgradeCategory = 'processing';
-    private tabContainer!: Phaser.GameObjects.Container;
-
     constructor() {
         super({ key: 'SkillTreeScene' });
     }
@@ -40,22 +25,58 @@ export class SkillTreeScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor(Theme.colors.bg);
 
         const { width, height } = this.scale;
-
-        // Create Tab Bar first
-        this.createTabBar();
-
         const grid = this.add.grid(0, 0, 8000, 8000, 100, 100, undefined, undefined, 0xffffff, 0.05);
 
         this.container = this.add.container(width / 2, height / 2);
         this.container.add(grid);
 
-        // Draw tree for current category
-        this.drawTree();
+        const gm = GameManager.getInstance();
+        const upgrades = gm.getAllUpgrades();
 
-        // Center on Root initially
-        this.container.setPosition(width / 2, height - 100);
+        // Draw Lines First
+        this.lineGraphics = this.add.graphics();
+        this.container.add(this.lineGraphics);
 
+        // Calculate positions based on GM data
+        const GRID_X = 180; // Widened grid (140 -> 180) to allow more space
+        const GRID_Y = 150; // Slightly taller (140 -> 150)
 
+        upgrades.forEach(u => {
+            const px = u.pos.x * GRID_X;
+            const py = -u.pos.y * GRID_Y; // Flip Y because screen Y is down, but logical Y is up
+
+            if (u.parentId) {
+                const parent = gm.getUpgrade(u.parentId);
+                if (parent) {
+                    const pPx = parent.pos.x * GRID_X;
+                    const pPy = -parent.pos.y * GRID_Y;
+
+                    const isUnlocked = parent.level > 0;
+                    this.lineGraphics.lineStyle(4, isUnlocked ? 0x00ccff : 0x444444, 1);
+                    this.lineGraphics.beginPath();
+
+                    // Standard "Circuit Board" routing (Vertical -> Horizontal -> Vertical)
+                    // No offset gimmicks, just clean lines.
+                    const midY = (pPy + py) / 2;
+
+                    this.lineGraphics.moveTo(pPx, pPy);
+                    this.lineGraphics.lineTo(pPx, midY); // Down from Parent
+                    this.lineGraphics.lineTo(px, midY);  // Across to Child Col
+                    this.lineGraphics.lineTo(px, py);    // Down to Child
+
+                    this.lineGraphics.strokePath();
+                }
+            }
+        });
+
+        // Draw Nodes
+        this.nodeVisuals.clear();
+        upgrades.forEach(u => {
+            const px = u.pos.x * GRID_X;
+            const py = -u.pos.y * GRID_Y;
+            const node = this.createNode(u, px, py);
+            this.container.add(node);
+        });
 
         // Center on Root initially (0,0) with some offset usually
         this.container.setPosition(width / 2, height - 150);
@@ -114,154 +135,10 @@ export class SkillTreeScene extends Phaser.Scene {
         this.cursorDot.setScrollFactor(0);
     }
 
-    private createTabBar() {
-        const { width } = this.scale;
-        const gm = GameManager.getInstance();
-
-        this.tabContainer = this.add.container(width / 2, 25);
-        this.tabContainer.setScrollFactor(0);
-        this.tabContainer.setDepth(2000);
-
-        const tabWidth = 150;
-        const tabHeight = 45;
-        const spacing = 10;
-        const totalWidth = TABS.length * tabWidth + (TABS.length - 1) * spacing;
-        const startX = -totalWidth / 2;
-
-        TABS.forEach((tab, index) => {
-            const x = startX + index * (tabWidth + spacing) + tabWidth / 2;
-            const isUnlocked = gm.isTabUnlocked(tab.category);
-            const isActive = this.currentCategory === tab.category;
-
-            // Tab background
-            const bg = this.add.graphics();
-            if (isActive) {
-                bg.fillStyle(0x00ccff, 1);
-            } else if (isUnlocked) {
-                bg.fillStyle(0x333333, 1);
-            } else {
-                bg.fillStyle(0x1a1a1a, 0.8);
-            }
-            bg.fillRoundedRect(-tabWidth / 2, -tabHeight / 2, tabWidth, tabHeight, 8);
-            bg.setPosition(x, 0);
-
-            // Tab text
-            const label = this.add.text(x, 0, `${tab.icon} ${tab.label}`, {
-                fontFamily: '"Noto Sans JP", sans-serif',
-                fontSize: '16px',
-                color: isUnlocked ? (isActive ? '#000000' : '#ffffff') : '#666666',
-                fontStyle: isActive ? 'bold' : 'normal'
-            }).setOrigin(0.5);
-
-            // Make unlocked tabs interactive
-            if (isUnlocked) {
-                const hitArea = this.add.rectangle(x, 0, tabWidth, tabHeight, 0x000000, 0)
-                    .setInteractive({ useHandCursor: true })
-                    .on('pointerdown', () => {
-                        if (this.currentCategory !== tab.category) {
-                            this.currentCategory = tab.category;
-                            this.refreshTree();
-                        }
-                    })
-                    .on('pointerover', () => {
-                        if (!isActive) label.setColor('#00ccff');
-                    })
-                    .on('pointerout', () => {
-                        label.setColor(isActive ? '#000000' : '#ffffff');
-                    });
-                this.tabContainer.add(hitArea);
-            } else {
-                // Show lock hint on hover for locked tabs
-                const hitArea = this.add.rectangle(x, 0, tabWidth, tabHeight, 0x000000, 0)
-                    .setInteractive()
-                    .on('pointerover', () => {
-                        const hint = gm.getTabUnlockHint(tab.category);
-                        label.setText(`🔒 ${hint}`);
-                        label.setFontSize('12px');
-                    })
-                    .on('pointerout', () => {
-                        label.setText(`${tab.icon} ${tab.label}`);
-                        label.setFontSize('16px');
-                    });
-                this.tabContainer.add(hitArea);
-            }
-
-            this.tabContainer.add([bg, label]);
-        });
-    }
-
-    private drawTree() {
-        const gm = GameManager.getInstance();
-        // Get upgrades for current category only
-        const upgrades = gm.getUpgradesByCategory(this.currentCategory);
-
-        // Clear existing if any
-        if (this.lineGraphics) {
-            this.lineGraphics.clear();
-        } else {
-            this.lineGraphics = this.add.graphics();
-            this.container.add(this.lineGraphics);
-        }
-
-        // Clear existing nodes
-        this.nodeVisuals.forEach(node => node.destroy());
-        this.nodeVisuals.clear();
-
-        const GRID_X = 180;
-        const GRID_Y = 150;
-
-        // Draw Lines
-        upgrades.forEach(u => {
-            const px = u.pos.x * GRID_X;
-            const py = -u.pos.y * GRID_Y;
-
-            if (u.parentId) {
-                const parent = gm.getUpgrade(u.parentId);
-                // Only draw line if parent is in same category
-                if (parent && parent.category === this.currentCategory) {
-                    const pPx = parent.pos.x * GRID_X;
-                    const pPy = -parent.pos.y * GRID_Y;
-
-                    const isUnlocked = parent.level > 0;
-                    this.lineGraphics.lineStyle(4, isUnlocked ? 0x00ccff : 0x444444, 1);
-                    this.lineGraphics.beginPath();
-
-                    const midY = (pPy + py) / 2;
-                    this.lineGraphics.moveTo(pPx, pPy);
-                    this.lineGraphics.lineTo(pPx, midY);
-                    this.lineGraphics.lineTo(px, midY);
-                    this.lineGraphics.lineTo(px, py);
-
-                    this.lineGraphics.strokePath();
-                }
-            }
-        });
-
-        // Draw Nodes
-        upgrades.forEach(u => {
-            const px = u.pos.x * GRID_X;
-            const py = -u.pos.y * GRID_Y;
-            const node = this.createNode(u, px, py);
-            this.container.add(node);
-        });
-    }
-
-    private refreshTree() {
-        // Destroy old tab container and recreate
-        if (this.tabContainer) this.tabContainer.destroy();
-        this.createTabBar();
-        this.drawTree();
-
-        // Reset container position
-        const { width, height } = this.scale;
-        this.container.setPosition(width / 2, height - 100);
-    }
-
     private updateHUD() {
         const gm = GameManager.getInstance();
         this.moneyLabel.setText(`¥${gm.getMoney().toLocaleString()} | プラ: ${gm.plastic} | 金属: ${gm.metal}`);
     }
-
 
     private createNode(upgrade: any, x: number, y: number): Phaser.GameObjects.Container {
         const gm = GameManager.getInstance();
@@ -328,8 +205,8 @@ export class SkillTreeScene extends Phaser.Scene {
     private redrawLines() {
         const gm = GameManager.getInstance();
         const upgrades = gm.getAllUpgrades();
-        const GRID_X = 100;
-        const GRID_Y = 140;
+        const GRID_X = 180;
+        const GRID_Y = 150;
 
         this.lineGraphics.clear();
 
@@ -344,7 +221,7 @@ export class SkillTreeScene extends Phaser.Scene {
                     const pPy = -parent.pos.y * GRID_Y;
 
                     const isUnlocked = parent.level > 0;
-                    this.lineGraphics.lineStyle(3, isUnlocked ? 0x00ccff : 0x444444, 1);
+                    this.lineGraphics.lineStyle(4, isUnlocked ? 0x00ccff : 0x444444, 1);
                     this.lineGraphics.beginPath();
 
                     // Standard "Circuit Board" routing

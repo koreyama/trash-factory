@@ -11,6 +11,8 @@ export class SoundManager {
         }
     }
 
+    private loops: Map<string, { osc: OscillatorNode, noise: AudioBufferSourceNode, gain: GainNode }> = new Map();
+
     static getInstance(): SoundManager {
         if (!SoundManager.instance) {
             SoundManager.instance = new SoundManager();
@@ -43,6 +45,65 @@ export class SoundManager {
                 this.noise(0.1);
                 break;
         }
+    }
+
+    public startLoop(id: string, type: 'vacuum') {
+        if (!this.enabled || !this.ctx || this.loops.has(id)) return;
+
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.1); // Fade in
+
+        const osc = this.ctx.createOscillator();
+        const noiseS = this.createNoiseSource();
+
+        if (type === 'vacuum') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, this.ctx.currentTime);
+        }
+
+        osc.connect(gain);
+        noiseS.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start();
+        noiseS.start();
+
+        this.loops.set(id, { osc, noise: noiseS, gain });
+    }
+
+    public stopLoop(id: string) {
+        const loop = this.loops.get(id);
+        if (loop && this.ctx) {
+            loop.gain.gain.cancelScheduledValues(this.ctx.currentTime);
+            loop.gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1); // Fade out
+            setTimeout(() => {
+                try {
+                    loop.osc.stop();
+                    loop.noise.stop();
+                    loop.osc.disconnect();
+                    loop.noise.disconnect();
+                    loop.gain.disconnect();
+                } catch (e) { }
+            }, 100);
+            this.loops.delete(id);
+        }
+    }
+
+    private createNoiseSource(): AudioBufferSourceNode {
+        if (!this.ctx) throw new Error("No ctx");
+        const bufferSize = this.ctx.sampleRate * 2; // 2 seconds
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        return source;
     }
 
     private beep(freq: number, duration: number, type: OscillatorType = 'sine', vol: number = 0.1) {
