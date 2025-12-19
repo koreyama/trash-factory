@@ -56,6 +56,7 @@ export class SkillTreeScene extends Phaser.Scene {
         this.container.setPosition(width / 2, height - 100);
 
 
+
         // Center on Root initially (0,0) with some offset usually
         this.container.setPosition(width / 2, height - 150);
 
@@ -327,8 +328,8 @@ export class SkillTreeScene extends Phaser.Scene {
     private redrawLines() {
         const gm = GameManager.getInstance();
         const upgrades = gm.getAllUpgrades();
-        const GRID_X = 180;
-        const GRID_Y = 150;
+        const GRID_X = 100;
+        const GRID_Y = 140;
 
         this.lineGraphics.clear();
 
@@ -343,21 +344,15 @@ export class SkillTreeScene extends Phaser.Scene {
                     const pPy = -parent.pos.y * GRID_Y;
 
                     const isUnlocked = parent.level > 0;
-                    const isChildUnlocked = u.level > 0;
-
-                    // Use different colors based on state
-                    let color = 0x333333; // Dark gray for locked
-                    if (isUnlocked && isChildUnlocked) {
-                        color = 0x00ff88; // Green for fully unlocked
-                    } else if (isUnlocked) {
-                        color = 0x00aaff; // Blue for parent unlocked
-                    }
-
-                    this.lineGraphics.lineStyle(2, color, 0.8);
+                    this.lineGraphics.lineStyle(3, isUnlocked ? 0x00ccff : 0x444444, 1);
                     this.lineGraphics.beginPath();
 
-                    // Direct diagonal line from parent to child
+                    // Standard "Circuit Board" routing
+                    const midY = (pPy + py) / 2;
+
                     this.lineGraphics.moveTo(pPx, pPy);
+                    this.lineGraphics.lineTo(pPx, midY);
+                    this.lineGraphics.lineTo(px, midY);
                     this.lineGraphics.lineTo(px, py);
 
                     this.lineGraphics.strokePath();

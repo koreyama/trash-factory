@@ -141,6 +141,26 @@ export class AchievementScene extends Phaser.Scene {
                 fontStyle: 'bold'
             }).setOrigin(1, 0.5);
 
+            // Hidden Trigger for Roguelike Mode
+            if (ach.id === 'ach_money_1') {
+                const hiddenTrigger = this.add.rectangle(width / 2, 37.5, 800, 75, 0x000000, 0)
+                    .setInteractive({ useHandCursor: true });
+
+                let clicks = 0;
+                hiddenTrigger.on('pointerdown', () => {
+                    clicks++;
+                    if (clicks === 10) {
+                        try {
+                            SoundManager.getInstance().play('success');
+                        } catch (e) { /* ignore */ }
+
+                        console.log('HIDDEN MODE ACTIVATED');
+                        this.scene.start('StageSelectScene');
+                    }
+                });
+                row.add(hiddenTrigger);
+            }
+
             row.add([bg, icon, iconText, title, desc, status]);
             this.scrollContainer.add(row);
         });

@@ -400,6 +400,12 @@ export class MainScene extends Phaser.Scene {
 
         // 4. Inventory Bar
         this.createInventoryBar();
+        // Hidden Game Trigger (R key)
+        this.input.keyboard.on('keydown-R', () => {
+            console.log("Entering Hidden Mode...");
+            this.scene.start('RoguelikeScene', { startLevel: 1 });
+        });
+
     }
 
     update(_time: number, delta: number) {

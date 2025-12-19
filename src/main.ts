@@ -6,6 +6,8 @@ import { MainScene } from './scenes/MainScene';
 import { SkillTreeScene } from './scenes/SkillTreeScene';
 import { AchievementScene } from './scenes/AchievementScene';
 import { CraftingScene } from './scenes/CraftingScene';
+import { StageSelectScene } from './scenes/StageSelectScene';
+import { RoguelikeScene } from './scenes/RoguelikeScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.WEBGL, // Force WebGL for GPU acceleration (was AUTO)
@@ -25,7 +27,7 @@ const config: Phaser.Types.Core.GameConfig = {
       constraintIterations: 1, // Default is 2
     }
   },
-  scene: [TitleScene, MainScene, SkillTreeScene, AchievementScene, CraftingScene, SettingsScene],
+  scene: [TitleScene, MainScene, SkillTreeScene, AchievementScene, CraftingScene, SettingsScene, StageSelectScene, RoguelikeScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH

@@ -106,7 +106,28 @@ export class GameManager {
 
     public upgrades: Upgrade[] = [];
     public achievements: Achievement[] = [];
+
     public inventory: { [key in GadgetType]?: number } = {};
+
+    // Roguelike Persistent Stats
+    public rogueGold: number = 0;
+    public rogueStats = {
+        might: 0,       // Damage
+        armor: 0,       // Defense
+        maxHp: 0,       // Health
+        recovery: 0,    // Regen
+        cooldown: 0,    // Cooldown Reduction
+        area: 0,        // Attack Size
+        speed: 0,       // Projectile Speed
+        duration: 0,    // Effect Duration
+        amount: 0,      // Projectile Count
+        moveSpeed: 0,   // Movement Speed
+        magnet: 0,      // Pickup Range
+        luck: 0,        // Crit/Drop
+        greed: 0,       // Gold Gain
+        growth: 0,      // Exp Gain
+        revival: 0      // Extra Lives
+    };
 
     private constructor() {
         this.initUpgrades();
@@ -143,21 +164,21 @@ export class GameManager {
         // === TIER 1 (Basics) ===
         // === TIER 1 (Basics) ===
         // Rebalance: spawn_speed maxLv 20. More impactful per level.
-        add('spawn_speed', '搬入速度', 'ゴミ出現頻度UP (-100ms/Lv)', 200, 'root_mining', 20, 1.6, { x: -1, y: 1 }, (gm, lv) => {
+        add('spawn_speed', '搬入速度', 'ゴミ出現頻度UP (-100ms/Lv)', 200, 'root_mining', 20, 1.6, { x: -2, y: 1 }, (gm, lv) => {
             // 1000ms start, min 100ms. Each level = -100ms.
             gm.spawnDelay = Math.max(100, 1000 - (lv * 100));
         });
         add('val_base', '基礎価値', 'ゴミの基本価値UP (+5円/Lv)', 100, 'root_mining', 20, 1.5, { x: 0, y: 1 }, (gm, lv) => {
             gm.trashValue = 10 + (lv * 5);
         });
-        add('vacuum_unlock', '吸引装置', '長押しでゴミを吸い寄せる', 300, 'root_mining', 1, 1, { x: 1, y: 1 }, () => { });
+        add('vacuum_unlock', '吸引装置', '長押しでゴミを吸い寄せる', 300, 'root_mining', 1, 1, { x: 2, y: 1 }, () => { });
 
         // === TIER 2 (Expansion) ===
         // Rebalance: floor_capacity maxLv 50. More impactful per level.
-        add('floor_capacity', '床面積拡張', '最大ゴミ数+30個/Lv', 1500, 'spawn_speed', 50, 1.5, { x: -2, y: 2 }, (gm, lv) => {
+        add('floor_capacity', '床面積拡張', '最大ゴミ数+30個/Lv', 1500, 'spawn_speed', 50, 1.5, { x: -4, y: 2 }, (gm, lv) => {
             gm.trashCapacity = 30 + (lv * 30);
         });
-        add('unlock_plastic', 'プラ回収許可', 'プラスチックゴミが出現', 500, 'spawn_speed', 1, 1, { x: -1, y: 2 }, () => { });
+        add('unlock_plastic', 'プラ回収許可', 'プラスチックゴミが出現', 500, 'spawn_speed', 1, 1, { x: -2, y: 2 }, () => { });
 
         // Market moved to avoid overlap with unlock_plastic
         // Combo Chip moved from (0,1) collision to (0,3)
@@ -168,77 +189,77 @@ export class GameManager {
         add('marketing', '広告戦略', '全収入倍率+10%/Lv', 2000, 'val_base', 10, 1.5, { x: 0, y: 2 }, (gm, lv) => {
             gm.marketingMultiplier = 1.0 + (lv * 0.1);
         });
-        add('vacuum_power', '吸引力強化', '吸引スピードUP', 500, 'vacuum_unlock', 10, 1.5, { x: 1, y: 2 }, (gm, lv) => {
+        add('vacuum_power', '吸引力強化', '吸引スピードUP', 500, 'vacuum_unlock', 10, 1.5, { x: 2, y: 2 }, (gm, lv) => {
             gm.vacuumPower = 0.005 + (lv * 0.002);
         });
-        add('unlock_metal', '金属回収許可', '金属ゴミが出現', 2000, 'vacuum_unlock', 1, 1, { x: 2, y: 2 }, () => { });
+        add('unlock_metal', '金属回収許可', '金属ゴミが出現', 2000, 'vacuum_unlock', 1, 1, { x: 4, y: 2 }, () => { });
 
         // === TIER 3 (Specialization) ===
-        add('black_hole_unlock', 'ブラックホール', 'ゴミを吸い込む特異点を生成', 50000, 'floor_capacity', 1, 1, { x: -3, y: 3 }, () => { }, { type: 'metal', amount: 100 });
-        add('spawn_variety', '多様性', '特殊ゴミ出現率UP', 2500, 'unlock_plastic', 5, 1.5, { x: -2, y: 3 }, () => { });
+        add('black_hole_unlock', 'ブラックホール', 'ゴミを吸い込む特異点を生成', 50000, 'floor_capacity', 1, 1, { x: -6, y: 3 }, () => { }, { type: 'metal', amount: 100 });
+        add('spawn_variety', '多様性', '特殊ゴミ出現率UP', 2500, 'unlock_plastic', 5, 1.5, { x: -4, y: 3 }, () => { });
 
         // Moved from (-1, 2) to (-1, 3) to unhide unlock_plastic
-        add('market_manipulation', '相場操作', '一時的に売却額UPスキル', 5000, 'marketing', 1, 1, { x: -1, y: 3 }, () => { });
+        add('market_manipulation', '相場操作', '一時的に売却額UPスキル', 5000, 'marketing', 1, 1, { x: -2, y: 3 }, () => { });
 
         // Shifted (0,3) -> (0,4)
         add('click_crit', 'クリティカル', 'クリック時に確率で3倍収入', 500, 'combo_chip', 10, 1.6, { x: 0, y: 4 }, (gm, lv) => {
             gm.critChance = Math.min(0.5, lv * 0.05);
         });
-        add('vacuum_range', '吸引範囲', '吸引の有効範囲拡大', 600, 'vacuum_power', 10, 1.5, { x: 1, y: 3 }, (gm, lv) => {
+        add('vacuum_range', '吸引範囲', '吸引の有効範囲拡大', 600, 'vacuum_power', 10, 1.5, { x: 2, y: 3 }, (gm, lv) => {
             gm.vacuumRange = 200 + (lv * 50);
         });
 
-        add('unlock_crafting', 'クラフト許可', 'ガジェット製作を解禁', 5000, 'unlock_metal', 1, 1, { x: 2, y: 3 }, () => { });
-        add('drone_unlock', '自律ドローン', '自動回収ドローンを配備', 30000, 'unlock_metal', 1, 1, { x: 3, y: 3 }, (gm) => { gm.droneUnlocked = true; });
+        add('unlock_crafting', 'クラフト許可', 'ガジェット製作を解禁', 5000, 'unlock_metal', 1, 1, { x: 4, y: 3 }, () => { });
+        add('drone_unlock', '自律ドローン', '自動回収ドローンを配備', 30000, 'unlock_metal', 1, 1, { x: 6, y: 3 }, (gm) => { gm.droneUnlocked = true; });
 
         // === TIER 4 (Technological Leap) ===
         // Black Hole Branch
-        add('hawking_radiation', 'ホーキング放射', '活性化中、エネルギーを少し還元', 200000, 'black_hole_unlock', 1, 1, { x: -4, y: 4 }, () => { });
-        add('event_horizon', '事象の地平線', 'ブラックホールの吸引範囲拡大', 3000, 'black_hole_unlock', 5, 1.6, { x: -3, y: 4 }, () => {
+        add('hawking_radiation', 'ホーキング放射', '活性化中、エネルギーを少し還元', 200000, 'black_hole_unlock', 1, 1, { x: -8, y: 4 }, () => { });
+        add('event_horizon', '事象の地平線', 'ブラックホールの吸引範囲拡大', 3000, 'black_hole_unlock', 5, 1.6, { x: -6, y: 4 }, () => {
             // Logic handled in BlackHole.ts
         });
 
-        add('unlock_circuit', '基板回収', '電子基板ゴミが出現', 10000, 'spawn_variety', 1, 1, { x: -2, y: 4 }, () => { });
+        add('unlock_circuit', '基板回収', '電子基板ゴミが出現', 10000, 'spawn_variety', 1, 1, { x: -4, y: 4 }, () => { });
         // Shifted (0,4) -> (0,5)
         add('luck_unlock', 'ラッキーゴミ', '金色のゴミが出現', 5000, 'click_crit', 1, 1, { x: 0, y: 5 }, (gm) => { gm.luckRate = 0.05; });
 
-        add('dynamite_spec', '発破技術', 'ダイナマイトの効果範囲拡大', 15000, 'unlock_crafting', 5, 1.5, { x: 1, y: 4 }, (gm, lv) => {
+        add('dynamite_spec', '発破技術', 'ダイナマイトの効果範囲拡大', 15000, 'unlock_crafting', 5, 1.5, { x: 2, y: 4 }, (gm, lv) => {
             gm.dynamiteRange = 150 + (lv * 30);
         });
 
-        add('solar_panel', 'ソーラーパネル', '毎秒エネルギー+1/Lv（レーザー用）', 20000, 'unlock_crafting', 10, 1.5, { x: 2, y: 4 }, (gm, lv) => {
+        add('solar_panel', 'ソーラーパネル', '毎秒エネルギー+1/Lv（レーザー用）', 20000, 'unlock_crafting', 10, 1.5, { x: 4, y: 4 }, (gm, lv) => {
             gm.energyGeneration = lv * 1;
         });
 
-        add('drone_spec', 'ドローン性能', '移動速度UP', 80000, 'drone_unlock', 5, 1.8, { x: 4, y: 4 }, (gm, lv) => {
+        add('drone_spec', 'ドローン性能', '移動速度UP', 80000, 'drone_unlock', 5, 1.8, { x: 8, y: 4 }, (gm, lv) => {
             gm.droneSpeed = 100 + (lv * 50);
         });
 
         // === TIER 5 (Advanced Infrastructure) ===
-        add('singularity_engine', '特異点エンジン', 'ブラックホールの成長速度UP', 150000, 'hawking_radiation', 3, 2.0, { x: -4, y: 5 }, () => { });
-        add('recycling_tech', '資源循環', '全資源の獲得量+1', 300000, 'unlock_circuit', 3, 2.0, { x: -2, y: 5 }, (gm, lv) => {
+        add('singularity_engine', '特異点エンジン', 'ブラックホールの成長速度UP', 150000, 'hawking_radiation', 3, 2.0, { x: -8, y: 5 }, () => { });
+        add('recycling_tech', '資源循環', '全資源の獲得量+1', 300000, 'unlock_circuit', 3, 2.0, { x: -4, y: 5 }, (gm, lv) => {
             gm.plasticPerTrash = 1 + lv;
         });
 
-        add('unlock_bio', 'バイオ処理', 'バイオ細胞ゴミが出現', 150000, 'research_lab', 1, 1, { x: -1, y: 6 }, () => { });
-        add('research_lab', '研究所', '次世代技術を解禁', 500000, 'unlock_circuit', 1, 1, { x: -1, y: 5 }, () => { });
+        add('unlock_bio', 'バイオ処理', 'バイオ細胞ゴミが出現', 150000, 'research_lab', 1, 1, { x: -2, y: 6 }, () => { });
+        add('research_lab', '研究所', '次世代技術を解禁', 500000, 'unlock_circuit', 1, 1, { x: -2, y: 5 }, () => { });
 
         // Shifted (0,5) -> (0,6)
         add('rainbow_trash', '虹色ゴミ', '超高額ゴミが出現', 75000, 'luck_unlock', 1, 1, { x: 0, y: 6 }, () => { });
 
-        add('gadget_mastery', 'ガジェット研究', 'クラフトコスト削減', 50000, 'dynamite_spec', 5, 1.5, { x: 1, y: 5 }, (gm, lv) => {
+        add('gadget_mastery', 'ガジェット研究', 'クラフトコスト削減', 50000, 'dynamite_spec', 5, 1.5, { x: 2, y: 5 }, (gm, lv) => {
             gm.craftingCostReduction = Math.min(0.5, lv * 0.1);
         });
 
-        add('battery_upgrade', '大容量蓄電池', '最大エネルギー保存量UP', 50000, 'solar_panel', 5, 1.5, { x: 2, y: 5 }, (gm, lv) => {
+        add('battery_upgrade', '大容量蓄電池', '最大エネルギー保存量UP', 50000, 'solar_panel', 5, 1.5, { x: 4, y: 5 }, (gm, lv) => {
             gm.maxEnergy = 100 + (lv * 100);
         });
 
-        add('unlock_industry', '産業革命', '自動資源生成・売却系を解禁', 100000, 'drone_spec', 1, 1, { x: 3, y: 5 }, () => { });
-        add('drone_ai', 'AI制御', 'ドローンの効率化', 120000, 'drone_spec', 1, 1, { x: 5, y: 5 }, () => { });
+        add('unlock_industry', '産業革命', '自動資源生成・売却系を解禁', 100000, 'drone_spec', 1, 1, { x: 6, y: 5 }, () => { });
+        add('drone_ai', 'AI制御', 'ドローンの効率化', 120000, 'drone_spec', 1, 1, { x: 10, y: 5 }, () => { });
 
         // === TIER 6 (Future Tech) ===
-        add('quantum_destabilizer', '量子分解', '爆発で資源を獲得可能に', 800000, 'singularity_engine', 1, 1, { x: -4, y: 6 }, () => { });
+        add('quantum_destabilizer', '量子分解', '爆発で資源を獲得可能に', 800000, 'singularity_engine', 1, 1, { x: -8, y: 6 }, () => { });
 
         add('incinerator', '廃棄物発電', 'バイオゴミ消却時にエナジー', 100000, 'unlock_bio', 5, 1.6, { x: -2, y: 7 }, () => { });
 
@@ -246,36 +267,36 @@ export class GameManager {
         // Parent changed: research_lab -> rainbow_trash (0,6) to avoid crossing Y=6
         add('quantum_core', '量子コア', '全速度倍増', 1000000, 'rainbow_trash', 1, 1, { x: 0, y: 7 }, () => { });
 
-        add('laser_grid', '防衛レーザー', '画面下半分のゴミを自動焦却（エネルギー消費）', 250000, 'battery_upgrade', 5, 2.0, { x: 2, y: 6 }, (gm, lv) => {
+        add('laser_grid', '防衛レーザー', '画面下半分のゴミを自動焦却（エネルギー消費）', 250000, 'battery_upgrade', 5, 2.0, { x: 4, y: 6 }, (gm, lv) => {
             gm.laserPower = lv * 10;
         });
 
-        add('magnet_field', '磁力場', '金属・基板ゴミを画面中央に引き寄せる', 40000, 'gadget_mastery', 1, 1, { x: 1, y: 6 }, () => { });
+        add('magnet_field', '磁力場', '金属・基板ゴミを画面中央に引き寄せる', 40000, 'gadget_mastery', 1, 1, { x: 2, y: 6 }, () => { });
 
-        add('auto_miner', '自動採掘', '毎秒プラ+金属をLv個ずつ獲得', 200000, 'unlock_industry', 10, 1.3, { x: 4, y: 6 }, () => { });
-        add('auto_factory', '自動工場', '毎秒プラ+金属をLv個売却して換金', 500000, 'unlock_industry', 10, 1.4, { x: 5, y: 6 }, () => { });
+        add('auto_miner', '自動採掘', '毎秒プラ+金属をLv個ずつ獲得', 200000, 'unlock_industry', 10, 1.3, { x: 8, y: 6 }, () => { });
+        add('auto_factory', '自動工場', '毎秒プラ+金属をLv個売却して換金', 500000, 'unlock_industry', 10, 1.4, { x: 10, y: 6 }, () => { });
 
         // === TIER 7 (Cosmic Tech) ===
         // === TIER 7 (Cosmic Tech) ===
         // Parent changed: quantum_core -> recycling_tech (-2,5) to avoid crossing incinerator (-1,7)
         // Path: (-2,5) -> (-2,7). Crosses (-2,6) which is empty.
-        add('gravity_manipulator', '重力制御', 'ゴミの落下速度低下(積みやすい)', 2000000, 'recycling_tech', 3, 1.5, { x: -3, y: 7 }, () => { });
+        add('gravity_manipulator', '重力制御', 'ゴミの落下速度低下(積みやすい)', 2000000, 'recycling_tech', 3, 1.5, { x: -6, y: 7 }, () => { });
         // REMOVED PRESTIGE UNLOCK
         // add('prestige_unlock', '転生システム', '強くてニューゲーム', 10000000, 'quantum_core', 1, 1, { x: 0, y: 7 }, () => { });
-        add('time_machine', 'タイムマシン', '失ったゴミを回収', 25000000, 'quantum_core', 1, 1, { x: 1, y: 7 }, () => { });
+        add('time_machine', 'タイムマシン', '失ったゴミを回収', 25000000, 'quantum_core', 1, 1, { x: 2, y: 7 }, () => { });
 
-        add('auto_sorter', '自動選別機', '特定ゴミを即時換金', 1500000, 'auto_factory', 1, 1, { x: 4, y: 7 }, () => { });
-        add('global_mining', '世界展開', '収入効率大幅UP', 800000, 'auto_factory', 1, 1, { x: 6, y: 7 }, () => { });
+        add('auto_sorter', '自動選別機', '特定ゴミを即時換金', 1500000, 'auto_factory', 1, 1, { x: 8, y: 7 }, () => { });
+        add('global_mining', '世界展開', '収入効率大幅UP', 800000, 'auto_factory', 1, 1, { x: 12, y: 7 }, () => { });
 
         // === TIER 8 (Dimensional) ===
         // Black Hole (End of Press Branch)
         // Black Hole (End of Press Branch)
-        add('black_hole_storage', '無限圧縮', '床面積上限を9999に拡張', 50000000, 'gravity_manipulator', 1, 1, { x: -3, y: 8 }, (gm) => { gm.trashCapacity = 9999; });
+        add('black_hole_storage', '無限圧縮', '床面積上限を9999に拡張', 50000000, 'gravity_manipulator', 1, 1, { x: -4, y: 8 }, (gm) => { gm.trashCapacity = 9999; });
 
         // REMOVED MULTIVERSE
         // add('multiverse', '多元宇宙', '並行世界から収入を得る', 50000000, 'prestige_unlock', 1, 1, { x: 0, y: 8 }, () => { });
 
-        add('time_warp', '時間跳躍', '時間加速スキル', 75000000, 'time_machine', 1, 1, { x: 2, y: 8 }, () => { });
+        add('time_warp', '時間跳躍', '時間加速スキル', 75000000, 'time_machine', 1, 1, { x: 4, y: 8 }, () => { });
 
         add('nanobot_swarm', 'ナノボット', '画面全体のゴミを徐々に分解', 1000000, 'incinerator', 1, 1, { x: -2, y: 8 }, () => { });
 
@@ -284,7 +305,7 @@ export class GameManager {
         // Updated parent for buy_planet since multiverse is gone. Using black_hole_storage or similar?
         // Let's link it to black_hole_storage or time_warp.
         add('buy_planet', '地球買収', 'ゲームクリア', 100000000, 'black_hole_storage', 1, 1, { x: 0, y: 9 }, () => { console.log("WIN"); }, { type: 'metal', amount: 5000 });
-        add('galactic_fed', '銀河連邦加盟', 'エンディング分岐B', 200000000, 'buy_planet', 1, 1, { x: 1, y: 10 }, () => { }, { type: 'circuit', amount: 9999 });
+        add('galactic_fed', '銀河連邦加盟', 'エンディング分岐B', 200000000, 'buy_planet', 1, 1, { x: 2, y: 10 }, () => { }, { type: 'circuit', amount: 9999 });
 
         // =====================================================
         // === NEW CONTENT: Extended Branches ===
@@ -292,45 +313,45 @@ export class GameManager {
 
         // === TIER 6: New Trash Types ===
         // Battery (Rare Metal) - unlocks from auto_sorter
-        add('unlock_battery', 'バッテリー回収', 'バッテリーゴミが出現（レアメタル獲得）', 500000, 'auto_sorter', 1, 1, { x: 5, y: 7 }, () => { });
+        add('unlock_battery', 'バッテリー回収', 'バッテリーゴミが出現（レアメタル獲得）', 500000, 'auto_sorter', 1, 1, { x: 10, y: 7 }, () => { });
 
         // Medical Waste - unlocks from incinerator
-        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: -1, y: 8 }, () => { });
+        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: 0, y: 8 }, () => { });
 
         // === SPACE DEVELOPMENT BRANCH ===
         // Satellite (Dark Matter) - unlocks from research_lab
-        add('unlock_satellite', '衛星回収許可', '人工衛星パーツが出現（ダークマター獲得）', 5000000, 'research_lab', 1, 1, { x: -4, y: 6 }, () => { });
+        add('unlock_satellite', '衛星回収許可', '人工衛星パーツが出現（ダークマター獲得）', 5000000, 'research_lab', 1, 1, { x: -6, y: 6 }, () => { });
 
-        add('space_debris', '宇宙デブリ処理', '衛星パーツ出現率UP (+10%/Lv)', 8000000, 'unlock_satellite', 5, 1.5, { x: -5, y: 7 }, () => { });
+        add('space_debris', '宇宙デブリ処理', '衛星パーツ出現率UP (+10%/Lv)', 8000000, 'unlock_satellite', 5, 1.5, { x: -8, y: 7 }, () => { });
 
-        add('orbital_station', '軌道ステーション', 'パッシブでダークマター獲得', 20000000, 'space_debris', 3, 2.0, { x: -6, y: 8 }, () => { });
+        add('orbital_station', '軌道ステーション', 'パッシブでダークマター獲得', 20000000, 'space_debris', 3, 2.0, { x: -10, y: 8 }, () => { });
 
-        add('moon_base', '月面基地', 'ダークマター生成速度2倍', 50000000, 'orbital_station', 1, 1, { x: -7, y: 9 }, () => { }, { type: 'darkMatter', amount: 500 });
+        add('moon_base', '月面基地', 'ダークマター生成速度2倍', 50000000, 'orbital_station', 1, 1, { x: -10, y: 9 }, () => { }, { type: 'darkMatter', amount: 500 });
 
-        add('mars_colony', '火星コロニー', '真のエンディング解放', 500000000, 'moon_base', 1, 1, { x: -7, y: 10 }, () => { console.log("MARS WIN"); }, { type: 'darkMatter', amount: 5000 });
+        add('mars_colony', '火星コロニー', '真のエンディング解放', 500000000, 'moon_base', 1, 1, { x: -8, y: 10 }, () => { console.log("MARS WIN"); }, { type: 'darkMatter', amount: 5000 });
 
         // === NUCLEAR ENERGY BRANCH ===
-        // Nuclear Waste (Radioactive) - unlocks from unlock_bio -> Changed to incinerator to avoid overlap
-        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'incinerator', 1, 1, { x: -3, y: 9 }, () => { });
+        // Nuclear Waste (Radioactive) - unlocks from unlock_bio
+        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'unlock_bio', 1, 1, { x: -2, y: 9 }, () => { });
 
-        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -3, y: 10 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
+        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -4, y: 10 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
 
-        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -3, y: 11 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
+        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -4, y: 11 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
 
         // === QUANTUM PHYSICS BRANCH ===
         // Quantum Device (Quantum Crystal) - unlocks from quantum_core
-        add('unlock_quantum', '量子デバイス回収', '量子デバイスが出現（量子結晶獲得）', 50000000, 'quantum_core', 1, 1, { x: 1, y: 8 }, () => { });
+        add('unlock_quantum', '量子デバイス回収', '量子デバイスが出現（量子結晶獲得）', 50000000, 'quantum_core', 1, 1, { x: 2, y: 8 }, () => { });
 
-        add('quantum_storage', '量子ストレージ', '床容量+500', 80000000, 'unlock_quantum', 3, 1.5, { x: 2, y: 9 }, (gm, lv) => { gm.trashCapacity += lv * 500; });
+        add('quantum_storage', '量子ストレージ', '床容量+500', 80000000, 'unlock_quantum', 3, 1.5, { x: 4, y: 9 }, (gm, lv) => { gm.trashCapacity += lv * 500; });
 
-        add('quantum_teleport', '量子テレポート', 'ゴミを瞬時に回収可能', 150000000, 'quantum_storage', 1, 1, { x: 3, y: 10 }, () => { });
+        add('quantum_teleport', '量子テレポート', 'ゴミを瞬時に回収可能', 150000000, 'quantum_storage', 1, 1, { x: 6, y: 10 }, () => { });
 
-        add('quantum_multiverse', 'マルチバース', '並行世界から収入を得る', 1000000000, 'quantum_teleport', 1, 1, { x: 3, y: 11 }, () => { console.log("MULTIVERSE WIN"); }, { type: 'quantumCrystal', amount: 10000 });
+        add('quantum_multiverse', 'マルチバース', '並行世界から収入を得る', 1000000000, 'quantum_teleport', 1, 1, { x: 6, y: 11 }, () => { console.log("MULTIVERSE WIN"); }, { type: 'quantumCrystal', amount: 10000 });
 
         // === RARE METAL BRANCH ===
-        add('rare_metal_processing', 'レアメタル精製', 'レアメタル獲得量+1/Lv', 1000000, 'unlock_battery', 5, 1.5, { x: 6, y: 8 }, () => { });
+        add('rare_metal_processing', 'レアメタル精製', 'レアメタル獲得量+1/Lv', 1000000, 'unlock_battery', 5, 1.5, { x: 12, y: 8 }, () => { });
 
-        add('rare_alloy', '特殊合金', 'ガジェット効果2倍', 5000000, 'rare_metal_processing', 1, 1, { x: 7, y: 9 }, () => { }, { type: 'rareMetal', amount: 500 });
+        add('rare_alloy', '特殊合金', 'ガジェット効果2倍', 5000000, 'rare_metal_processing', 1, 1, { x: 14, y: 9 }, () => { }, { type: 'rareMetal', amount: 500 });
 
         // =====================================================
         // === CATEGORY ASSIGNMENT (Assign upgrades to tabs) ===
@@ -539,6 +560,109 @@ export class GameManager {
 
     public getGadgetCount(type: GadgetType): number {
         return this.inventory[type] || 0;
+    }
+
+    // --- Roguelike Upgrade System ---
+
+    // --- Roguelike Upgrade System (Vampire Survivors Style) ---
+
+    public getRogueStatInfo(type: keyof typeof this.rogueStats): { name: string, desc: string, cost: number, max: number } {
+        const level = this.rogueStats[type];
+        // Base costs and scaling (Simplified VS style)
+        // PowerUp costs usually scale: Base * (1 + 0.1 * total_bought_powerups). 
+        // For simplicity, let's just scale by level for now.
+
+        let baseCost = 100;
+        let maxLevel = 5;
+        let name = type.toUpperCase();
+        let desc = "Upgrade";
+
+        switch (type) {
+            case 'might': baseCost = 200; maxLevel = 5; name = "攻撃力"; desc = "ダメージ +10%"; break;
+            case 'armor': baseCost = 200; maxLevel = 3; name = "防御力"; desc = "被ダメージ -1"; break;
+            case 'maxHp': baseCost = 200; maxLevel = 5; name = "最大HP"; desc = "HP +10%"; break;
+            case 'recovery': baseCost = 200; maxLevel = 5; name = "自動回復"; desc = "0.1 HP/秒"; break;
+            case 'cooldown': baseCost = 900; maxLevel = 2; name = "クールダウン"; desc = "CT -2.5%"; break;
+            case 'area': baseCost = 300; maxLevel = 2; name = "攻撃範囲"; desc = "サイズ +10%"; break;
+            case 'speed': baseCost = 300; maxLevel = 2; name = "弾速"; desc = "速度 +10%"; break;
+            case 'duration': baseCost = 300; maxLevel = 2; name = "持続時間"; desc = "効果時間 +15%"; break;
+            case 'amount': baseCost = 5000; maxLevel = 1; name = "発射数"; desc = "発射数 +1"; break;
+            case 'moveSpeed': baseCost = 300; maxLevel = 2; name = "移動速度"; desc = "速度 +5%"; break;
+            case 'magnet': baseCost = 300; maxLevel = 2; name = "吸引範囲"; desc = "回収範囲 +25%"; break;
+            case 'luck': baseCost = 600; maxLevel = 3; name = "運気"; desc = "ドロップ率 +10%"; break;
+            case 'greed': baseCost = 200; maxLevel = 5; name = "強欲"; desc = "獲得ゴールド +10%"; break;
+            case 'growth': baseCost = 900; maxLevel = 5; name = "成長"; desc = "獲得経験値 +3%"; break;
+            case 'revival': baseCost = 10000; maxLevel = 1; name = "復活"; desc = "復活回数 +1"; break;
+        }
+
+        // Simple exponential curve + flat
+        const cost = Math.floor(baseCost * Math.pow(1.7, level));
+        return { name, desc, cost, max: maxLevel };
+    }
+
+    public upgradeRogueStat(type: keyof typeof this.rogueStats): boolean {
+        const info = this.getRogueStatInfo(type);
+        if (this.rogueStats[type] >= info.max) return false;
+
+        if (this.rogueGold >= info.cost) {
+            this.rogueGold -= info.cost;
+            this.rogueStats[type]++;
+            this.save();
+            return true;
+        }
+        return false;
+    }
+
+    public refundAllRogueStats() {
+        let totalRefund = 0;
+
+        for (const key in this.rogueStats) {
+            const type = key as keyof typeof this.rogueStats;
+            const level = this.rogueStats[type];
+
+            // Calculate total cost spent for this level
+            // Since cost varies by level, we need to sum up cost of level 0, 1, 2...
+            for (let i = 0; i < level; i++) {
+                // To get cost of upgrading FROM i to i+1
+                // We need to temporarily set level to i to use getRogueStatInfo or extract logic
+                // Let's replicate logic locally for safety
+                // Cost formula was: baseCost * pow(1.7, i)
+
+                // Hacky but safe: calculate refund based on current config
+                // Ideally we should track "spentGold" but calculating is fine for now
+                // Wait, getRogueStatInfo relies on current level.
+                // Re-calculating...
+
+                // Let's refactor getRogueStatInfo to take optional level
+                totalRefund += this.calculateCostForLevel(type, i);
+            }
+            this.rogueStats[type] = 0;
+        }
+
+        this.rogueGold += totalRefund;
+        this.save();
+    }
+
+    private calculateCostForLevel(type: keyof typeof this.rogueStats, level: number): number {
+        let baseCost = 100;
+        switch (type) {
+            case 'might': baseCost = 200; break;
+            case 'armor': baseCost = 200; break;
+            case 'maxHp': baseCost = 200; break;
+            case 'recovery': baseCost = 200; break;
+            case 'cooldown': baseCost = 900; break;
+            case 'area': baseCost = 300; break;
+            case 'speed': baseCost = 300; break;
+            case 'duration': baseCost = 300; break;
+            case 'amount': baseCost = 5000; break;
+            case 'moveSpeed': baseCost = 300; break;
+            case 'magnet': baseCost = 300; break;
+            case 'luck': baseCost = 600; break;
+            case 'greed': baseCost = 200; break;
+            case 'growth': baseCost = 900; break;
+            case 'revival': baseCost = 10000; break;
+        }
+        return Math.floor(baseCost * Math.pow(1.7, level));
     }
 
     private initAchievements() {
@@ -861,7 +985,9 @@ export class GameManager {
                 marketingMultiplier: this.marketingMultiplier
             },
             upgrades: this.upgrades.map(u => ({ id: u.id, level: u.level })),
-            achievements: this.achievements.map(a => ({ id: a.id, unlocked: a.unlocked }))
+            achievements: this.achievements.map(a => ({ id: a.id, unlocked: a.unlocked })),
+            rogueStats: this.rogueStats,
+            rogueGold: this.rogueGold
         };
         localStorage.setItem('cyber_trash_save_v4', JSON.stringify(data));
     }
@@ -871,6 +997,12 @@ export class GameManager {
         if (raw) {
             const data = JSON.parse(raw);
             this.money = data.money || 0;
+            this.rogueGold = data.rogueGold || 0;
+
+            if (data.rogueStats) {
+                // Smart merge to handle new params
+                this.rogueStats = { ...this.rogueStats, ...data.rogueStats };
+            }
             this.plastic = data.plastic || 0;
             this.metal = data.metal || 0;
             this.circuit = data.circuit || 0;
