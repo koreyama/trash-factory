@@ -34,11 +34,11 @@ const config: Phaser.Types.Core.GameConfig = {
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
   // GPU Performance Optimizations
+  resolution: window.devicePixelRatio || 1, // Use device pixel ratio for crispness
   render: {
     antialias: true, // Enable antialiasing for smoother text/edges
     pixelArt: false,
     roundPixels: false, // Turn off roundPixels for smoother text rendering at high DPR
-    resolution: window.devicePixelRatio || 1, // Use device pixel ratio for crispness
     powerPreference: 'high-performance',
     batchSize: 4096,
     maxLights: 10
