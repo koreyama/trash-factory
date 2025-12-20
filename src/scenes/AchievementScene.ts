@@ -142,7 +142,7 @@ export class AchievementScene extends Phaser.Scene {
             }).setOrigin(1, 0.5);
 
             // Hidden Trigger for Roguelike Mode
-            if (ach.id === 'ach_money_1') {
+            if (ach.id === 'ach_start') {
                 const hiddenTrigger = this.add.rectangle(width / 2, 37.5, 800, 75, 0x000000, 0)
                     .setInteractive({ useHandCursor: true });
 
@@ -155,6 +155,11 @@ export class AchievementScene extends Phaser.Scene {
                         } catch (e) { /* ignore */ }
 
                         console.log('HIDDEN MODE ACTIVATED');
+                        const gm = GameManager.getInstance();
+                        if (!gm.secretModeDiscovered) {
+                            gm.secretModeDiscovered = true;
+                            gm.save();
+                        }
                         this.scene.start('StageSelectScene');
                     }
                 });

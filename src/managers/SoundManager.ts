@@ -2,6 +2,7 @@ export class SoundManager {
     private static instance: SoundManager;
     private ctx: AudioContext | null = null;
     private enabled: boolean = true;
+    private volume: number = 1.0;
 
     private constructor() {
         try {
@@ -18,6 +19,20 @@ export class SoundManager {
             SoundManager.instance = new SoundManager();
         }
         return SoundManager.instance;
+    }
+
+    public setVolume(v: number) {
+        this.volume = Math.max(0, Math.min(1, v));
+        // Update active loops? 
+        // Iterate loops and ramp gain? Too complex for now. 
+        // Changes take effect on next play/loop start or we can try to update live.
+        this.loops.forEach(loop => {
+            // Basic live update attempt
+            // loop.gain.gain.cancelScheduledValues(this.ctx!.currentTime);
+            // loop.gain.gain.setValueAtTime(loop.gain.gain.value, this.ctx!.currentTime);
+            // loop.gain.gain.linearRampToValueAtTime(0.05 * this.volume, ...);
+            // Logic varies per loop type (vacuum vs conveyor). Skip live update for simplicity.
+        });
     }
 
     public play(type: 'click' | 'hover' | 'success' | 'error' | 'destroy') {
@@ -55,7 +70,7 @@ export class SoundManager {
         const gain = this.ctx.createGain();
         gain.gain.setValueAtTime(0, this.ctx.currentTime);
         const fadeTime = 0.5; // Smoother fade
-        gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + fadeTime);
+        gain.gain.linearRampToValueAtTime(0.05 * this.volume, this.ctx.currentTime + fadeTime);
 
         const osc = this.ctx.createOscillator();
         const noiseS = this.createNoiseSource();
@@ -76,7 +91,7 @@ export class SoundManager {
             osc.frequency.setValueAtTime(50, this.ctx.currentTime); // Low rumble
             filter.type = 'lowpass';
             filter.frequency.setValueAtTime(200, this.ctx.currentTime); // Muffled mechanical noise
-            gain.gain.linearRampToValueAtTime(0.03, this.ctx.currentTime + fadeTime); // Quiet
+            gain.gain.linearRampToValueAtTime(0.03 * this.volume, this.ctx.currentTime + fadeTime); // Quiet
         }
         else if (type === 'lava') {
             osc.frequency.setValueAtTime(0, this.ctx.currentTime); // No tone, just noise
@@ -208,7 +223,7 @@ export class SoundManager {
         osc.type = type;
         osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
 
-        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol * this.volume, this.ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
 
         osc.connect(gain);
@@ -224,7 +239,7 @@ export class SoundManager {
             const osc = this.ctx!.createOscillator();
             const gain = this.ctx!.createGain();
             osc.frequency.setValueAtTime(f, now);
-            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.setValueAtTime(0.1 * this.volume, now);
             gain.gain.linearRampToValueAtTime(0, now + durs[i]);
             osc.connect(gain);
             gain.connect(this.ctx!.destination);
@@ -247,7 +262,7 @@ export class SoundManager {
         const noise = this.ctx.createBufferSource();
         noise.buffer = buffer;
         const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.05, this.ctx.currentTime); // Low volume
+        gain.gain.setValueAtTime(0.05 * this.volume, this.ctx.currentTime); // Low volume
         gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
 
         noise.connect(gain);

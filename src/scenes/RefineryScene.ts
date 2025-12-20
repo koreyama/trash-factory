@@ -288,7 +288,13 @@ export class RefineryScene extends Phaser.Scene {
         }
 
         gm.addResource(resType, (gm.plasticPerTrash || 1) * mult);
-        gm.addMoney(Math.floor(gm.trashValue * mult)); // Money also scales
+        const earnings = Math.floor(gm.trashValue * mult * gm.marketMultiplier);
+        gm.addMoney(earnings); // Money also scales with market
+
+        if (gm.futuresUnlocked && gm.marketMultiplier !== 1.0) {
+            // Maybe show extra feedback?
+            new FloatingText(this, trash.x, trash.y - 60, `x${gm.marketMultiplier.toFixed(2)}`, '#f1c40f');
+        }
 
 
         if (station === 'lava') {
@@ -549,8 +555,14 @@ export class RefineryScene extends Phaser.Scene {
         }
     }
 
-    update() {
+    update(_time: number, delta: number) {
         if (this.backPressed) return;
+
+        const gm = GameManager.getInstance();
+        const finance = gm.update(delta);
+        if (finance.interestPaid > 0) {
+            new FloatingText(this, 100, 150, `+¥${Math.floor(finance.interestPaid)}`, '#f1c40f');
+        }
 
         // Lava
         if (this.lavaGraphics && this.lavaPool) {

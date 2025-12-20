@@ -17,6 +17,7 @@ export class MainScene extends Phaser.Scene {
     private blackHoleBtn!: Phaser.GameObjects.Container;
 
     // Gadget State
+    private gadgetCooldown: number = 0;
     private overclockActive: boolean = false;
 
 
@@ -392,7 +393,6 @@ export class MainScene extends Phaser.Scene {
 
         // 3. UI Display
         this.createUI();
-        this.createBlackHoleButton();
         this.createSkillTreeButton();
 
         // Event listener for money updates
@@ -417,6 +417,14 @@ export class MainScene extends Phaser.Scene {
     }
 
     update(_time: number, delta: number) {
+        // Track Playtime
+        GameManager.getInstance().playTime += delta;
+
+        // Gadget Cooldown
+        if (this.gadgetCooldown > 0) {
+            this.gadgetCooldown -= delta;
+        }
+
         // Gadget Timers
         if (this.overclockActive) {
             this.overclockTimer -= delta;
@@ -442,6 +450,7 @@ export class MainScene extends Phaser.Scene {
             if (this.autoBotTimer <= 0) {
                 this.autoBotActive = false;
                 if (this.superDrone) {
+                    this.tweens.killTweensOf(this.superDrone);
                     this.superDrone.destroy();
                     this.superDrone = null;
                 }
@@ -450,6 +459,18 @@ export class MainScene extends Phaser.Scene {
 
         // Dynamite Drag visuals & Vacuum Logic
         const gm = GameManager.getInstance();
+
+        // Financial Checks
+        const finance = gm.update(delta);
+        if (finance.interestPaid > 0) {
+            new FloatingText(this, 200, 60, `+¥${Math.floor(finance.interestPaid)} (Interest)`, '#f1c40f');
+        }
+        if (finance.marketChanged) {
+            const trend = gm.marketTrend === 'BULL' ? '↑' : (gm.marketTrend === 'BEAR' ? '↓' : '-');
+            const color = gm.marketTrend === 'BULL' ? '#2ecc71' : (gm.marketTrend === 'BEAR' ? '#e74c3c' : '#ffffff');
+            new FloatingText(this, 120, 100, `Market: ${trend} (${Math.floor(gm.marketMultiplier * 100)}%)`, color);
+        }
+
         const pointer = this.input.activePointer;
 
         if (this.isDraggingDynamite) {
@@ -572,7 +593,9 @@ export class MainScene extends Phaser.Scene {
 
             // Auto Factory
             const factory = gm.getUpgrade('auto_factory');
-            if (factory && factory.level > 0) {
+            const shouldSell = gm.marketMultiplier >= (gm.autoSellThreshold || 0);
+
+            if (factory && factory.level > 0 && shouldSell) {
                 // Sell 1 Plastic & 1 Metal per level
                 const amount = factory.level;
                 let sold = 0;
@@ -588,7 +611,7 @@ export class MainScene extends Phaser.Scene {
 
                 if (sold > 0) {
                     // Bonus value for processed goods?
-                    const earnings = sold * gm.trashValue * 2;
+                    const earnings = Math.floor(sold * gm.trashValue * 2 * gm.marketMultiplier);
                     gm.addMoney(earnings);
                     this.updateUI(); // Ensure UI reflects passive income
                     this.checkAch(); // Check achievements
@@ -692,6 +715,8 @@ export class MainScene extends Phaser.Scene {
     }
 
     private createExplosion(x: number, y: number) {
+        if (!GameManager.getInstance().settings.particles) return;
+
         const emitter = this.add.particles(x, y, 'particle', {
             speed: { min: 50, max: 150 },
             angle: { min: 0, max: 360 },
@@ -994,23 +1019,8 @@ export class MainScene extends Phaser.Scene {
 
     private createBlackHoleButton() {
         const { width } = this.scale;
-        // Position: width - 280, y = 10 (Standard for BHole)
-        this.blackHoleBtn = this.add.container(width - 280, 10);
 
-        const btnWidth = 150;
-        const btnHeight = 40;
-        const radius = 8;
-
-        this.blackHoleBg = this.add.graphics();
-        this.blackHoleBg.fillStyle(0x555555, 1);
-        this.blackHoleBg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
-        this.blackHoleBg.lineStyle(2, 0xffffff, 0.5);
-        this.blackHoleBg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
-
-        const hitArea = this.add.rectangle(btnWidth / 2, btnHeight / 2, btnWidth, btnHeight, 0x000000, 0);
-        hitArea.setInteractive({ useHandCursor: true });
-
-        hitArea.on('pointerdown', () => {
+        this.createStyledButton(width - 160, 10, 140, 'B.HOLE OFF', 0x555555, () => {
             SoundManager.getInstance().play('click');
             if (this.blackHole && !this.blackHole.isStable()) {
                 this.blackHole.triggerBigBang();
@@ -1018,15 +1028,51 @@ export class MainScene extends Phaser.Scene {
                 this.blackHole.toggle();
             }
             this.updateBlackHoleButton();
+        }).then(res => {
+            this.blackHoleBtn = res.container;
+            this.blackHoleBg = res.bg;
+            this.blackHoleText = res.text;
+            this.updateBlackHoleButton(); // Initial State Sync
         });
+    }
 
-        this.blackHoleText = this.add.text(btnWidth / 2, btnHeight / 2, 'B.HOLE OFF', {
-            ...Theme.styles.buttonText,
-            fontSize: '14px'
+    private async createStyledButton(x: number, y: number, width: number, textStr: string, color: number, onClick: () => void) {
+        const height = 40;
+        const radius = 8;
+
+        const container = this.add.container(x, y).setDepth(2000);
+
+        const bg = this.add.graphics();
+        bg.fillStyle(color, 1);
+        bg.fillRoundedRect(0, 0, width, height, radius);
+        bg.lineStyle(2, 0xffffff, 0.5);
+        bg.strokeRoundedRect(0, 0, width, height, radius);
+
+        const text = this.add.text(width / 2, height / 2, textStr, {
+            fontSize: '14px',
+            fontFamily: '"Orbitron", "Noto Sans JP", sans-serif',
+            color: '#fff',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.blackHoleBtn.add([this.blackHoleBg, this.blackHoleText, hitArea]);
-        this.blackHoleBtn.setDepth(1000);
+        const hitArea = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0)
+            .setInteractive({ useHandCursor: true });
+
+        hitArea.on('pointerdown', onClick);
+
+        // Hover
+        hitArea.on('pointerover', () => {
+            bg.lineStyle(2, 0x00ffff, 1);
+            bg.strokeRoundedRect(0, 0, width, height, radius);
+        });
+        hitArea.on('pointerout', () => {
+            bg.lineStyle(2, 0xffffff, 0.5);
+            bg.strokeRoundedRect(0, 0, width, height, radius);
+        });
+
+        container.add([bg, text, hitArea]);
+
+        return { container, bg, text };
     }
 
     private updateBlackHoleButton() {
@@ -1035,7 +1081,7 @@ export class MainScene extends Phaser.Scene {
         const isActive = this.blackHole.isActive();
         const isUnstable = !this.blackHole.isStable();
 
-        const btnWidth = 150;
+        const btnWidth = 140; // Updated Width
         const btnHeight = 40;
         const radius = 8;
 
@@ -1124,6 +1170,25 @@ export class MainScene extends Phaser.Scene {
                 craftBtn.setColor(Theme.colors.accent);
             });
             craftBtn.on('pointerout', () => craftBtn.setColor(Theme.colors.text));
+        }
+
+        // Finance Button (Tier 4+)
+        const financeUp = gm.getUpgrade('compound_interest');
+        if (financeUp && financeUp.level > 0) {
+            const financeBtn = this.add.text(350, 220, '資産運用 >', Theme.styles.buttonText)
+                .setInteractive({ useHandCursor: true })
+                .setDepth(1000)
+                .on('pointerdown', () => {
+                    SoundManager.getInstance().play('click');
+                    this.scene.pause();
+                    this.scene.launch('FinanceScene');
+                });
+
+            financeBtn.on('pointerover', () => {
+                SoundManager.getInstance().play('hover');
+                financeBtn.setColor(Theme.colors.accent);
+            });
+            financeBtn.on('pointerout', () => financeBtn.setColor(Theme.colors.text));
         }
     }
 
@@ -1264,25 +1329,35 @@ export class MainScene extends Phaser.Scene {
         const gm = GameManager.getInstance();
         const { width } = this.scale;
 
-        // Position: width - 410, y=10
-        this.droneToggleBtn = this.add.container(width - 410, 10).setDepth(2000);
+        const update = (bg: any, text: any) => {
+            bg.clear();
+            bg.fillStyle(gm.dronesActive ? 0x27ae60 : 0xc0392b, 1);
+            bg.fillRoundedRect(0, 0, 140, 40, 8);
+            bg.lineStyle(2, 0xffffff, 0.5);
+            bg.strokeRoundedRect(0, 0, 140, 40, 8);
+            text.setText(gm.dronesActive ? "DRONE: ON" : "DRONE: OFF");
+        };
 
-        const bg = this.add.rectangle(0, 0, 120, 40, gm.dronesActive ? 0x27ae60 : 0xc0392b, 0.8)
-            .setInteractive({ useHandCursor: true }).setOrigin(0);
-
-        const label = this.add.text(60, 20, gm.dronesActive ? "DRONE: ON" : "DRONE: OFF", {
-            fontSize: '14px',
-            fontFamily: 'Orbitron',
-            color: '#fff'
-        }).setOrigin(0.5);
-
-        this.droneToggleBtn.add([bg, label]);
-
-        bg.on('pointerdown', () => {
+        this.createStyledButton(width - 310, 10, 140, gm.dronesActive ? "DRONE: ON" : "DRONE: OFF", gm.dronesActive ? 0x27ae60 : 0xc0392b, () => {
             gm.dronesActive = !gm.dronesActive;
-            label.setText(gm.dronesActive ? "DRONE: ON" : "DRONE: OFF");
-            bg.setFillStyle(gm.dronesActive ? 0x27ae60 : 0xc0392b, 0.8);
             SoundManager.getInstance().play('click');
+            // Manual update needed for toggle buttons
+            // Find components (bit hacky, but robust enough for this scope)
+            // Or better, just recreate the visuals? 
+            // Since createStyledButton returns promise/result, we can use it if we stored ref.
+            // But here we are inside scope.
+            // Let's rely on updateFacilities to NOT recreate, but we need to update visual.
+            // Simplest: `updateFacilities` could handle visual update? No, it just checks creation.
+
+            // We can access children of container.
+            if (this.droneToggleBtn) {
+                const bg = this.droneToggleBtn.list[0] as Phaser.GameObjects.Graphics;
+                const text = this.droneToggleBtn.list[1] as Phaser.GameObjects.Text;
+                update(bg, text);
+            }
+        }).then(res => {
+            this.droneToggleBtn = res.container;
+            update(res.bg, res.text);
         });
     }
 
@@ -1290,24 +1365,17 @@ export class MainScene extends Phaser.Scene {
         const gm = GameManager.getInstance();
         const { width } = this.scale;
 
-        // Position: width - 540, y=10
-        this.conveyorToggleBtn = this.add.container(width - 540, 10).setDepth(2000);
+        const update = (bg: any, text: any) => {
+            bg.clear();
+            bg.fillStyle(gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, 1);
+            bg.fillRoundedRect(0, 0, 140, 40, 8);
+            bg.lineStyle(2, 0xffffff, 0.5);
+            bg.strokeRoundedRect(0, 0, 140, 40, 8);
+            text.setText(gm.conveyorActive ? "BELT: ON" : "BELT: OFF");
+        };
 
-        const bg = this.add.rectangle(0, 0, 120, 40, gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, 0.8)
-            .setInteractive({ useHandCursor: true }).setOrigin(0);
-
-        const label = this.add.text(60, 20, gm.conveyorActive ? "BELT: ON" : "BELT: OFF", {
-            fontSize: '14px',
-            fontFamily: 'Orbitron',
-            color: '#fff'
-        }).setOrigin(0.5);
-
-        this.conveyorToggleBtn.add([bg, label]);
-
-        bg.on('pointerdown', () => {
+        this.createStyledButton(width - 460, 10, 140, gm.conveyorActive ? "BELT: ON" : "BELT: OFF", gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, () => {
             gm.conveyorActive = !gm.conveyorActive;
-            label.setText(gm.conveyorActive ? "BELT: ON" : "BELT: OFF");
-            bg.setFillStyle(gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, 0.8);
             SoundManager.getInstance().play('click');
 
             // Toggle Graphics
@@ -1319,29 +1387,26 @@ export class MainScene extends Phaser.Scene {
             } else {
                 SoundManager.getInstance().stopLoop('conveyor');
             }
+
+            if (this.conveyorToggleBtn) {
+                const bg = this.conveyorToggleBtn.list[0] as Phaser.GameObjects.Graphics;
+                const text = this.conveyorToggleBtn.list[1] as Phaser.GameObjects.Text;
+                update(bg, text);
+            }
+        }).then(res => {
+            this.conveyorToggleBtn = res.container;
         });
     }
 
     private createRefineryButton() {
         const { width } = this.scale;
-        // Position: width - 670, y=10
-        this.refineryBtn = this.add.container(width - 670, 10).setDepth(2000);
 
-        const bg = this.add.rectangle(0, 0, 120, 40, 0x00d2d3, 0.8)
-            .setInteractive({ useHandCursor: true }).setOrigin(0);
-
-        const label = this.add.text(60, 20, "精製所へ", {
-            fontSize: '14px',
-            fontFamily: 'Noto Sans JP',
-            color: '#fff'
-        }).setOrigin(0.5);
-
-        this.refineryBtn.add([bg, label]);
-
-        bg.on('pointerdown', () => {
+        this.createStyledButton(width - 610, 10, 140, "精製所へ", 0x00d2d3, () => {
             SoundManager.getInstance().play('click');
             this.scene.pause(this);
             this.scene.launch('RefineryScene');
+        }).then(res => {
+            this.refineryBtn = res.container;
         });
     }
 
@@ -1406,43 +1471,29 @@ export class MainScene extends Phaser.Scene {
     }
     private createLaserButton() {
         const { width } = this.scale;
-        // Position: width - 130, y=10
-        this.laserBtn = this.add.container(width - 130, 10);
 
-        const btnWidth = 120;
-        const btnHeight = 40;
-        const radius = 8;
+        const update = (bg: any, text: any) => {
+            bg.clear();
+            bg.fillStyle(this.laserGridEnabled ? 0xe74c3c : 0x555555, 1);
+            bg.fillRoundedRect(0, 0, 140, 40, 8);
+            bg.lineStyle(2, 0xffffff, 0.5);
+            bg.strokeRoundedRect(0, 0, 140, 40, 8);
+            text.setText(this.laserGridEnabled ? 'LASER ON' : 'LASER OFF');
+        };
 
-        const bg = this.add.graphics();
-        bg.fillStyle(this.laserGridEnabled ? 0xe74c3c : 0x555555, 1);
-        bg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
-        bg.lineStyle(2, 0xffffff, 0.5);
-        bg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
-
-        const hitArea = this.add.rectangle(btnWidth / 2, btnHeight / 2, btnWidth, btnHeight, 0x000000, 0);
-        hitArea.setInteractive({ useHandCursor: true }).setOrigin(0.5);
-
-        const text = this.add.text(btnWidth / 2, btnHeight / 2, this.laserGridEnabled ? 'LASER ON' : 'LASER OFF', {
-            ...Theme.styles.buttonText,
-            fontSize: '14px'
-        }).setOrigin(0.5);
-
-        hitArea.on('pointerdown', () => {
+        this.createStyledButton(width - 760, 10, 140, this.laserGridEnabled ? 'LASER ON' : 'LASER OFF', this.laserGridEnabled ? 0xe74c3c : 0x555555, () => {
             SoundManager.getInstance().play('click');
             this.laserGridEnabled = !this.laserGridEnabled;
 
-            // Update visuals
-            bg.clear();
-            bg.fillStyle(this.laserGridEnabled ? 0xe74c3c : 0x555555, 1);
-            bg.fillRoundedRect(0, 0, btnWidth, btnHeight, radius);
-            bg.lineStyle(2, 0xffffff, 0.5);
-            bg.strokeRoundedRect(0, 0, btnWidth, btnHeight, radius);
-
-            text.setText(this.laserGridEnabled ? 'LASER ON' : 'LASER OFF');
+            if (this.laserBtn) {
+                const bg = this.laserBtn.list[0] as Phaser.GameObjects.Graphics;
+                const text = this.laserBtn.list[1] as Phaser.GameObjects.Text;
+                update(bg, text);
+            }
+        }).then(res => {
+            this.laserBtn = res.container;
+            this.laserBtn.setDepth(1000);
         });
-
-        this.laserBtn.add([bg, text, hitArea]);
-        this.laserBtn.setDepth(1000);
     }
 
     // === INVENTORY SYSTEM ===
@@ -1577,8 +1628,13 @@ export class MainScene extends Phaser.Scene {
     }
 
     private useGadget(type: GadgetType, pointer?: Phaser.Input.Pointer) {
+        if (this.gadgetCooldown > 0) return;
+
         const gm = GameManager.getInstance();
         if (gm.getGadgetCount(type) <= 0) return;
+
+        // Set cooldown (Quantum Swing needs more?)
+        this.gadgetCooldown = 500;
 
         // Effect Logic
         switch (type) {
@@ -1626,7 +1682,9 @@ export class MainScene extends Phaser.Scene {
     }
 
     private explodeAt(x: number, y: number) {
-        this.cameras.main.shake(200, 0.02);
+        if (GameManager.getInstance().settings.screenShake) {
+            this.cameras.main.shake(200, 0.02);
+        }
         this.createExplosion(x, y); // Visual
 
         // AoE Logic
@@ -1764,7 +1822,9 @@ export class MainScene extends Phaser.Scene {
 
         branch({ x: startTrash.x, y: startTrash.y - 1000 }, 0, 3);
 
-        this.cameras.main.shake(300, 0.01);
+        if (GameManager.getInstance().settings.screenShake) {
+            this.cameras.main.shake(300, 0.01);
+        }
         this.tweens.add({
             targets: graphics,
             alpha: 0,
@@ -1813,7 +1873,9 @@ export class MainScene extends Phaser.Scene {
 
         this.time.delayedCall(1500, () => {
             this.createExplosion(centerX, centerY);
-            this.cameras.main.shake(400, 0.03);
+            if (GameManager.getInstance().settings.screenShake) {
+                this.cameras.main.shake(400, 0.03);
+            }
             graphics.destroy();
         });
 
@@ -1866,7 +1928,9 @@ export class MainScene extends Phaser.Scene {
             });
         });
 
-        this.cameras.main.shake(200, 0.02);
+        if (GameManager.getInstance().settings.screenShake) {
+            this.cameras.main.shake(200, 0.02);
+        }
         SoundManager.getInstance().play('click');
     }
 }

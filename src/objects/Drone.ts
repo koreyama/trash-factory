@@ -101,6 +101,7 @@ export class Drone extends Phaser.GameObjects.Container {
             y: currentTarget.y,
             duration: duration,
             onComplete: () => {
+                if (!this.scene) return; // Safety check
                 // Check if target still exists and is close enough
                 if (currentTarget && !currentTarget.isDestroyed) {
                     const finalDist = Phaser.Math.Distance.Between(this.x, this.y, currentTarget.x, currentTarget.y);
@@ -108,12 +109,23 @@ export class Drone extends Phaser.GameObjects.Container {
                         currentTarget.onClicked(true); // Force critical for drone
                     }
                 }
-                this.returnHome();
+
+                // AI Chain Logic (Level > 0 check)
+                const ai = gm.getUpgrade('drone_ai');
+                if (ai && ai.level > 0 && gm.dronesActive) {
+                    this.isBusy = false; // Reset busy flag to allow finding new target
+                    this.target = null;
+                    this.findTarget(); // Chain immediately
+                } else {
+                    this.returnHome();
+                }
             }
         });
     }
 
     private returnHome() {
+        if (!this.scene) return; // Safety check
+
         const gm = GameManager.getInstance();
         const speed = gm.droneSpeed;
         const dist = Phaser.Math.Distance.Between(this.x, this.y, this.homeX, this.homeY);
@@ -125,6 +137,7 @@ export class Drone extends Phaser.GameObjects.Container {
             y: this.homeY,
             duration: duration,
             onComplete: () => {
+                if (!this.scene) return;
                 this.isBusy = false;
                 this.target = null;
             }

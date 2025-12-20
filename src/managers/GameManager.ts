@@ -41,6 +41,13 @@ export interface Gadget {
 }
 
 
+export interface GameSettings {
+    volume: number;
+    particles: boolean;
+    floatingText: boolean;
+    screenShake: boolean;
+}
+
 export class GameManager {
     private static instance: GameManager;
 
@@ -61,11 +68,13 @@ export class GameManager {
     public totalPlastic: number = 0;
     public totalMetal: number = 0;
     public totalCircuit: number = 0;
+    public totalBioCell: number = 0;
     public totalRareMetal: number = 0;
     public totalRadioactive: number = 0;
     public totalDarkMatter: number = 0;
     public totalQuantumCrystal: number = 0;
     public totalPress: number = 0;
+    public playTime: number = 0; // Milliseconds
 
     // Stats
     public trashValue: number = 10;
@@ -98,6 +107,25 @@ export class GameManager {
     public droneSpeed: number = 100;
     public droneCount: number = 1;
     public droneCapacity: number = 1;
+    public secretModeDiscovered: boolean = false;
+
+    public settings: GameSettings = {
+        volume: 0.5,
+        particles: true,
+        floatingText: true,
+        screenShake: true
+    };
+
+    // Financial Tech
+    public interestRate: number = 0;
+    public interestTimer: number = 0;
+    public interestCap: number = 10000;
+    public futuresUnlocked: boolean = false;
+    public marketMultiplier: number = 1.0;
+    public marketTimer: number = 0;
+    public marketTrend: string = 'STABLE'; // 'BULL', 'BEAR', 'STABLE'
+    public cryptoLevel: number = 0;
+    public cryptoTimer: number = 0;
 
     public conveyorUnlocked: boolean = false; // New: Conveyor facility
     public conveyorActive: boolean = false; // Default OFF
@@ -234,8 +262,13 @@ export class GameManager {
             gm.energyGeneration = lv * 1;
         });
 
+        add('compound_interest', '複利運用', '5秒毎に所持金の0.5%利息(Lvで上限UP)', 30000, 'drone_unlock', 10, 1.5, { x: 3, y: 4 }, (gm, lv) => {
+            gm.interestRate = 0.005;
+            gm.interestCap = 1000 + (lv * 1000);
+        });
+
         add('drone_spec', 'ドローン性能', '移動速度UP', 80000, 'drone_unlock', 5, 1.8, { x: 4, y: 4 }, (gm, lv) => {
-            gm.droneSpeed = 100 + (lv * 50);
+            gm.droneSpeed = 150 + (lv * 100);
         });
 
         // === TIER 5 (Advanced Infrastructure) ===
@@ -258,10 +291,12 @@ export class GameManager {
             gm.maxEnergy = 100 + (lv * 100);
         });
 
-        add('unlock_industry', '産業革命', '自動資源生成・売却系を解禁', 100000, 'drone_spec', 1, 1, { x: 3, y: 5 }, () => { });
+        add('unlock_industry', '産業革命', '自動資源生成・売却系を解禁', 100000, 'compound_interest', 1, 1, { x: 3, y: 5 }, () => { });
         add('drone_ai', 'AI制御', 'ドローンの効率化', 120000, 'drone_spec', 1, 1, { x: 5, y: 5 }, () => { });
 
         // === TIER 6 (Future Tech) ===
+        add('trash_futures', 'ゴミ先物取引', '売却価格が常に変動するように', 150000, 'unlock_industry', 1, 1, { x: 3, y: 6 }, (gm) => { gm.futuresUnlocked = true; });
+
         add('quantum_destabilizer', '量子分解', '爆発で資源を獲得可能に', 800000, 'singularity_engine', 1, 1, { x: -4, y: 6 }, () => { });
 
         add('incinerator', '廃棄物発電', 'バイオゴミ消却時にエナジー', 100000, 'unlock_bio', 5, 1.6, { x: -1, y: 7 }, () => { });
@@ -286,6 +321,10 @@ export class GameManager {
         // REMOVED PRESTIGE UNLOCK
         // add('prestige_unlock', '転生システム', '強くてニューゲーム', 10000000, 'quantum_core', 1, 1, { x: 0, y: 7 }, () => { });
         add('time_machine', 'タイムマシン', '失ったゴミを回収', 25000000, 'quantum_core', 1, 1, { x: 1, y: 7 }, () => { });
+
+        add('crypto_mining', '仮想通貨マイニング', 'エネルギーを消費して資金生成', 500000, 'trash_futures', 20, 1.4, { x: 3, y: 7 }, (gm, lv) => {
+            gm.cryptoLevel = lv;
+        });
 
         add('auto_sorter', '自動選別機', '特定ゴミを即時換金', 1500000, 'auto_factory', 1, 1, { x: 4, y: 7 }, () => { });
         add('global_mining', '世界展開', '収入効率大幅UP', 800000, 'auto_factory', 1, 1, { x: 6, y: 7 }, () => { });
@@ -360,8 +399,9 @@ export class GameManager {
 
 
     public addMoney(amount: number) {
-        this.money += amount;
-        this.totalMoney += amount;
+        const val = Math.floor(amount);
+        this.money = Math.floor(this.money + val);
+        if (amount > 0) this.totalMoney = Math.floor(this.totalMoney + val);
         this.save();
     }
 
@@ -377,6 +417,7 @@ export class GameManager {
             this.totalCircuit += amount;
         } else if (type === 'bioCell') {
             this.bioCell += amount;
+            this.totalBioCell += amount;
         } else if (type === 'rareMetal') {
             this.rareMetal += amount;
             this.totalRareMetal += amount;
@@ -394,8 +435,29 @@ export class GameManager {
     }
 
     public addEnergy(amount: number) {
-        this.energy = Math.min(this.maxEnergy, this.energy + amount);
-        this.save();
+        this.energy = Math.min(this.energy + amount, this.maxEnergy);
+        if (this.energy < 0) this.energy = 0;
+    }
+
+    // === BANK HELPERS ===
+    public depositToBank(amount: number) {
+        const val = Math.floor(amount);
+        if (val <= 0) return;
+        if (this.money >= val) {
+            this.money = Math.floor(this.money - val);
+            this.depositedMoney = Math.floor(this.depositedMoney + val);
+            this.save();
+        }
+    }
+
+    public withdrawFromBank(amount: number) {
+        const val = Math.floor(amount);
+        if (val <= 0) return;
+        if (this.depositedMoney >= val) {
+            this.depositedMoney = Math.floor(this.depositedMoney - val);
+            this.money = Math.floor(this.money + val);
+            this.save();
+        }
     }
 
     public spendResource(type: ResourceType, amount: number): boolean {
@@ -561,94 +623,64 @@ export class GameManager {
             this.achievements.push({ id, name, desc, unlocked: false, condition });
         };
 
-        // Linear Sorted Achievements
-        // Format: ID, Name, Desc, Condition
+        // === PHASE 1: STARTUP (序盤) ===
+        // === PHASE 1: STARTUP (序盤) ===
+        addAch('ach_start', '一歩目', '累計資金 1,000円', (gm) => gm.totalMoney >= 1000);
+        addAch('ach_craft', 'DIY精神', 'クラフト解禁', (gm) => (gm.getUpgrade('unlock_crafting')?.level ?? 0) > 0);
+        addAch('ach_click_100', '指の運動', '手動回収 100回', (gm) => gm.pressCount >= 100);
+        addAch('ach_plastic_100', 'プラスチック入門', '累計プラ 100個', (gm) => gm.totalPlastic >= 100);
+        addAch('ach_metal_100', 'スクラップ集め', '累計金属 100個', (gm) => gm.totalMetal >= 100);
+        addAch('ach_auto', '自動化の幕開け', 'ドローンを購入', (gm) => gm.droneUnlocked);
 
-        // Helper to generate tiers
-        const genTiers = (baseId: string, name: string, desc: string, unit: string, thresholds: number[], check: (gm: GameManager) => number) => {
-            thresholds.forEach((th, i) => {
-                const tier = i + 1;
-                const formatted = th.toLocaleString();
-                addAch(`${baseId}_${tier}`, `${name} Lv.${tier}`, `${desc} (${formatted}${unit})`, (gm) => check(gm) >= th);
-            });
-        };
-
-        // Money Tiers
-        genTiers('ach_money', '資産家', '累計獲得資金', '円',
-            [100, 1000, 5000, 10000, 50000, 100000, 500000, 1000000, 10000000, 50000000, 100000000, 1000000000],
-            (gm) => gm.totalMoney);
-
-        // Resource Tiers
-        genTiers('ach_plastic', 'プラ回収', '累計プラスチック', '個',
-            [50, 100, 500, 1000, 5000, 10000, 50000],
-            (gm) => gm.totalPlastic);
-
-        genTiers('ach_metal', '金属回収', '累計金属', '個',
-            [10, 50, 100, 500, 1000, 5000, 10000],
-            (gm) => gm.totalMetal);
-
-        genTiers('ach_circuit', '基板回収', '累計電子基板', '個',
-            [10, 50, 100, 500, 1000, 5000],
-            (gm) => gm.totalCircuit);
-
-        // Press Tiers REMOVED (Legacy)
-
-        // Upgrade Count Tiers
-        genTiers('ach_ups', '技術革新', 'アップグレード購入数', '回',
-            [1, 5, 10, 20, 30, 50, 75, 100, 150],
-            (gm) => gm.getAllUpgrades().reduce((sum, u) => sum + u.level, 0));
-
-        // Specific Upgrades
-        addAch('ach_craft', 'DIY', 'クラフト解禁', (gm) => (gm.getUpgrade('unlock_crafting')?.level ?? 0) > 0);
-        addAch('ach_drone', 'オートメーション', 'ドローン解禁', (gm) => gm.droneUnlocked);
-        addAch('ach_bh', '特異点', 'ブラックホール解禁', (gm) => (gm.getUpgrade('black_hole_unlock')?.level ?? 0) > 0);
+        // === PHASE 2: EXPANSION (拡大) ===
+        addAch('ach_plastic_k', 'プラスチック王', '累計プラ 5,000個', (gm) => gm.totalPlastic >= 5000);
+        addAch('ach_metal_k', '鉄の心', '累計金属 5,000個', (gm) => gm.totalMetal >= 5000);
+        addAch('ach_circuit_100', '電子工作', '累計基板 100個', (gm) => gm.totalCircuit >= 100);
+        addAch('ach_marketing', '広告戦略', '広告戦略 Lv10', (gm) => (gm.getUpgrade('marketing')?.level ?? 0) >= 10);
         addAch('ach_lab', '研究者', '研究所建設', (gm) => (gm.getUpgrade('research_lab')?.level ?? 0) > 0);
-        addAch('ach_planet', '地球買収', '地球を買収', (gm) => (gm.getUpgrade('buy_planet')?.level ?? 0) > 0);
+        addAch('ach_conveyor', 'ライン作業', 'ベルトコンベア設置', (gm) => gm.conveyorUnlocked);
 
-        // Max Level Milestones
-        addAch('ach_max_speed', '最速の搬入', '搬入速度MAX', (gm) => {
-            const u = gm.getUpgrade('spawn_speed');
-            return !!u && u.level >= u.maxLevel;
-        });
-        addAch('ach_max_cap', '無限の倉庫', '床面積MAX', (gm) => {
-            const u = gm.getUpgrade('floor_capacity');
-            return !!u && u.level >= u.maxLevel;
-        });
+        // === PHASE 3: INDUSTRIAL (産業) ===
+        addAch('ach_incinerator', '焼却処分', '焼却炉建設', (gm) => (gm.getUpgrade('incinerator')?.level ?? 0) > 0);
+        addAch('ach_automation_master', '工場長', 'Lv30 床面積拡張', (gm) => (gm.getUpgrade('floor_capacity')?.level ?? 0) >= 30);
+        addAch('ach_silicon', 'シリコンバレー', '累計基板 1,000個', (gm) => gm.totalCircuit >= 1000);
+        addAch('ach_gadget_10', '発明家', 'ガジェット所持数 合計10個', (gm) => Object.values(gm.inventory).reduce((a, b) => a + b, 0) >= 10);
+        addAch('ach_speed', '高速搬入', '搬入ディレイ 300ms以下', (gm) => gm.spawnDelay <= 300);
 
-        addAch('ach_finish', 'THE END', '全実績解除', (gm) => {
-            const total = gm.achievements.length;
-            const unlocked = gm.achievements.filter(a => a.unlocked && a.id !== 'ach_finish').length;
-            return unlocked >= total - 1;
-        });
+        // === PHASE 4: ECONOMY (経済) ===
+        addAch('ach_banker', '銀行家', '銀行預金 100万円', (gm) => gm.depositedMoney >= 1000000);
+        addAch('ach_hedge_fund', 'ヘッジファンド', '1回の利息が1万円超え', (gm) => Math.floor(gm.depositedMoney * 0.02) >= 10000);
+        addAch('ach_crypto', 'クリプト王', 'マイニング強度最大(10)', (gm) => gm.miningIntensity >= 10);
+        addAch('ach_rich', '億万長者', '総資産 1億円', (gm) => gm.totalMoney >= 100000000);
 
-        // === COMPLEX ACHIEVEMENTS ===
+        // === PHASE 5: ENERGY & PHYSICS (エネルギー・物理) ===
+        addAch('ach_nuclear', '原子力', '原子炉建設', (gm) => (gm.getUpgrade('nuclear_reactor')?.level ?? 0) > 0);
+        addAch('ach_fusion', '核融合', '核融合炉建設', (gm) => (gm.getUpgrade('fusion_reactor')?.level ?? 0) > 0);
+        addAch('ach_battery', 'エネルギー危機', '累計放射性物質 500個', (gm) => gm.radioactive >= 500);
+        addAch('ach_max_energy', 'フルパワー', 'エネルギー最大値 5,000', (gm) => gm.maxEnergy >= 5000);
+        addAch('ach_bh', '特異点', 'ブラックホールを生成', (gm) => (gm.getUpgrade('black_hole_unlock')?.level ?? 0) > 0);
 
-        // 1. Hoarder: Have 1000 Plastic AND Metal AND Circuit
-        addAch('ach_hoarder', '収集家', 'プラ・金属・基板を各1000個所持', (gm) => {
-            return gm.plastic >= 1000 && gm.metal >= 1000 && gm.circuit >= 1000;
-        });
+        // === PHASE 6: SPACE (宇宙) ===
+        addAch('ach_satellite', 'スペースデブリ', '衛星回収許可を取得', (gm) => (gm.getUpgrade('unlock_satellite')?.level ?? 0) > 0);
+        addAch('ach_stargazer', 'スターゲイザー', '軌道ステーション建設', (gm) => (gm.getUpgrade('orbital_station')?.level ?? 0) > 0);
+        addAch('ach_moon', '月面着陸', '月面基地建設', (gm) => (gm.getUpgrade('moon_base')?.level ?? 0) > 0);
+        addAch('ach_dark_matter', '暗黒物質', '累計ダークマター 100個', (gm) => gm.darkMatter >= 100);
 
-        // 2. Speed Demon: Spawn Delay < 200 ms
-        addAch('ach_speed_demon', 'スピード狂', '搬入間隔200ms以下', (gm) => {
-            return gm.spawnDelay <= 200;
-        });
+        // === PHASE 7: QUANTUM & ENDGAME (量子・終焉) ===
+        addAch('ach_quantum', '量子超越', '量子テレポート開発', (gm) => (gm.getUpgrade('quantum_teleport')?.level ?? 0) > 0);
+        addAch('ach_quantum_storage', '四次元ポケット', '量子ストレージ建設', (gm) => (gm.getUpgrade('quantum_storage')?.level ?? 0) > 0);
+        addAch('ach_mars', '火星移住計画', '火星コロニー建設 (Ending A)', (gm) => (gm.getUpgrade('mars_colony')?.level ?? 0) > 0);
+        addAch('ach_universe', '多元宇宙への旅', 'マルチバース到達 (Ending B)', (gm) => (gm.getUpgrade('quantum_multiverse')?.level ?? 0) > 0);
+        addAch('ach_earth', '地球の支配者', '地球買収完了 (Ending C)', (gm) => (gm.getUpgrade('buy_planet')?.level ?? 0) > 0);
 
-        // 3. Tech Tycoon: >10 Upgrades AND >1M Money (simultaneous)
-        addAch('ach_tech_tycoon', 'ハイテク長者', 'UG数10以上かつ所持金100万', (gm) => {
-            const upCount = gm.getAllUpgrades().reduce((sum, u) => sum + u.level, 0);
-            return upCount >= 10 && gm.money >= 1000000;
-        });
+        // === CHALLENGE & SECRET (やり込み・隠し) ===
+        addAch('ach_click_master', 'ゴッドフィンガー', '手動回収 5,000回', (gm) => gm.pressCount >= 5000);
+        addAch('ach_trillion', '兆万長者', '所持金 1兆円達成', (gm) => gm.money >= 1000000000000);
+        addAch('ach_hoarder', '収集癖', '全通常資源(プラ〜基板)が各10,000個', (gm) => gm.plastic >= 10000 && gm.metal >= 10000 && gm.circuit >= 10000);
+        addAch('ach_completionist', '完全制覇', '全アップグレード取得(Lv1以上)', (gm) => gm.getAllUpgrades().every(u => u.level > 0));
+        addAch('ach_speed_demon', '光速の領域', '搬入ディレイ 100ms(最小値)', (gm) => gm.spawnDelay <= 100);
+        addAch('ach_secret', '真実の探究者', '隠しモードを発見', (gm) => gm.secretModeDiscovered);
 
-        // 4. Energy Efficiency: Max Energy
-        addAch('ach_battery_king', 'エネルギータンク', 'エネルギー最大値500到達', (gm) => {
-            return gm.maxEnergy >= 500;
-        });
-
-        // 5. Gadget Master: Have 5 of each gadget type
-        addAch('ach_gadget_fan', 'ガジェットファン', '全ガジェットを5個ずつ所持', (gm) => {
-            const types: GadgetType[] = ['dynamite', 'magnet_bomb', 'midas_gel', 'overclock', 'auto_bot'];
-            return types.every(t => (gm.inventory[t] || 0) >= 5);
-        });
     }
 
 
@@ -849,11 +881,13 @@ export class GameManager {
             totalPlastic: this.totalPlastic,
             totalMetal: this.totalMetal,
             totalCircuit: this.totalCircuit,
+            totalBioCell: this.totalBioCell,
             totalRareMetal: this.totalRareMetal,
             totalRadioactive: this.totalRadioactive,
             totalDarkMatter: this.totalDarkMatter,
             totalQuantumCrystal: this.totalQuantumCrystal,
             pressCount: this.pressCount,
+            playTime: this.playTime,
             prestigeMultiplier: this.prestigeMultiplier,
             inventory: this.inventory,
             refineryInventory: this.refineryInventory,
@@ -877,7 +911,14 @@ export class GameManager {
             upgrades: this.upgrades.map(u => ({ id: u.id, level: u.level })),
             achievements: this.achievements.map(a => ({ id: a.id, unlocked: a.unlocked })),
             rogueStats: this.rogueStats,
-            rogueGold: this.rogueGold
+            rogueGold: this.rogueGold,
+            // Finance
+            depositedMoney: this.depositedMoney,
+            miningActive: this.miningActive,
+            miningIntensity: this.miningIntensity,
+            autoSellThreshold: this.autoSellThreshold,
+            secretModeDiscovered: this.secretModeDiscovered,
+            settings: this.settings
         };
         localStorage.setItem('cyber_trash_save_v4', JSON.stringify(data));
     }
@@ -886,8 +927,19 @@ export class GameManager {
         const raw = localStorage.getItem('cyber_trash_save_v4');
         if (raw) {
             const data = JSON.parse(raw);
-            this.money = data.money || 0;
-            this.rogueGold = data.rogueGold || 0;
+            this.money = Math.floor(data.money || 0);
+            this.rogueGold = Math.floor(data.rogueGold || 0);
+
+            // Finance Restore
+            this.depositedMoney = Math.floor(data.depositedMoney || 0);
+            this.miningActive = data.miningActive ?? false;
+            this.miningIntensity = data.miningIntensity ?? 1;
+            this.autoSellThreshold = data.autoSellThreshold ?? 0.0;
+            this.secretModeDiscovered = data.secretModeDiscovered ?? false;
+
+            if (data.settings) {
+                this.settings = { ...this.settings, ...data.settings };
+            }
 
             if (data.rogueStats) {
                 // Smart merge to handle new params
@@ -902,15 +954,17 @@ export class GameManager {
             this.darkMatter = data.darkMatter || 0;
             this.quantumCrystal = data.quantumCrystal || 0;
 
-            this.totalMoney = data.totalMoney || this.money;
+            this.totalMoney = Math.floor(data.totalMoney || this.money);
             this.totalPlastic = data.totalPlastic || this.plastic;
             this.totalMetal = data.totalMetal || this.metal;
             this.totalCircuit = data.totalCircuit || this.circuit;
+            this.totalBioCell = data.totalBioCell || this.bioCell;
             this.totalRareMetal = data.totalRareMetal || 0;
             this.totalRadioactive = data.totalRadioactive || 0;
             this.totalDarkMatter = data.totalDarkMatter || 0;
             this.totalQuantumCrystal = data.totalQuantumCrystal || 0;
             this.pressCount = data.pressCount || 0;
+            this.playTime = data.playTime || 0;
             this.prestigeMultiplier = data.prestigeMultiplier || 1.0;
             this.inventory = data.inventory || {};
             this.refineryInventory = data.refineryInventory || {};
@@ -943,7 +997,6 @@ export class GameManager {
                     if (up.level > 0) up.effect(this, up.level);
                 }
             });
-
             if (data.achievements) {
                 data.achievements.forEach((saved: any) => {
                     const ach = this.achievements.find(a => a.id === saved.id);
@@ -951,5 +1004,104 @@ export class GameManager {
                 });
             }
         }
+    }
+
+    public depositedMoney: number = 0; // Bank
+
+    public miningActive: boolean = false; // Crypto Toggle
+    public miningIntensity: number = 1; // 1-10
+    public autoSellThreshold: number = 0.0; // 0.0 = Trigger Always.
+
+    public sellResources(types: ResourceType[], percent: number = 1.0): number {
+        let revenue = 0;
+        const multiplier = this.marketMultiplier;
+        const base = this.trashValue;
+
+        const prices: Record<string, number> = {
+            'plastic': base * 2,
+            'metal': base * 2,
+            'circuit': base * 5,
+            'bioCell': base * 10,
+            'rareMetal': base * 20,
+            'radioactive': base * 50,
+            'darkMatter': base * 100,
+            'quantumCrystal': base * 500
+        };
+
+        types.forEach(type => {
+            const current = (this as any)[type] as number;
+            if (current > 0) {
+                const amount = Math.floor(current * percent);
+                if (amount > 0) {
+                    const price = prices[type] || base;
+                    const earnings = Math.floor(amount * price * multiplier);
+                    revenue += earnings;
+                    this.addResource(type, -amount);
+                }
+            }
+        });
+
+        if (revenue > 0) {
+            this.addMoney(revenue);
+        }
+        return revenue;
+    }
+
+    public update(delta: number): { interestPaid: number, marketChanged: boolean, cryptoPaid: number } {
+        let interestPaid = 0;
+        let marketChanged = false;
+        let cryptoPaid = 0;
+
+        // Interest (Bank)
+        // Interest (Bank)
+        if (true) { // Always active if Bank UI is accessible
+            this.interestTimer += delta;
+            if (this.interestTimer >= 10000) { // 10s
+                this.interestTimer = 0;
+
+                if (this.depositedMoney > 0) {
+                    const payment = Math.floor(this.depositedMoney * 0.02); // 2%
+                    if (payment > 0) {
+                        this.depositedMoney += payment; // Add to bank
+                        interestPaid = payment;
+                    }
+                }
+            }
+        }
+
+        // Futures
+        if (this.futuresUnlocked) {
+            this.marketTimer += delta;
+            if (this.marketTimer >= 10000) {
+                this.marketTimer = 0;
+                // Random 0.8 to 1.5
+                this.marketMultiplier = 0.8 + (Math.random() * 0.7);
+                this.marketTrend = this.marketMultiplier >= 1.0 ? 'BULL' : 'BEAR';
+                marketChanged = true;
+            }
+        }
+
+        // Crypto
+        if (this.cryptoLevel > 0 && this.miningActive) {
+            this.cryptoTimer += delta;
+            if (this.cryptoTimer >= 1000) {
+                this.cryptoTimer = 0;
+
+                const cost = Math.ceil(this.miningIntensity * 10);
+                if (this.energy >= cost) {
+                    // Consume energy
+                    this.addEnergy(-cost);
+
+                    const gain = Math.floor(this.cryptoLevel * 100 * this.marketMultiplier * this.miningIntensity);
+                    this.addMoney(gain); // Mining goes to wallet
+                    cryptoPaid = gain;
+                } else {
+                    // Auto turn off if no energy? Or just stall?
+                    // Stall is fine.
+                }
+            }
+        }
+
+        return { interestPaid, marketChanged, cryptoPaid };
     }
 }
