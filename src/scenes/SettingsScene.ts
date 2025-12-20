@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GameManager } from '../managers/GameManager';
 import { SoundManager } from '../managers/SoundManager';
-import { Theme } from '../managers/Theme';
+
 
 export class SettingsScene extends Phaser.Scene {
     private callerScene: string = 'TitleScene';

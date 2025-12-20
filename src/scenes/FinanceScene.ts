@@ -22,7 +22,7 @@ export class FinanceScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Close
-        const close = this.add.text(width - 50, 50, '閉じる', {
+        this.add.text(width - 50, 50, '閉じる', {
             fontFamily: '"Noto Sans JP", sans-serif', fontSize: '18px', color: '#95a5a6'
         }).setInteractive({ useHandCursor: true })
             .setOrigin(0.5)
@@ -40,7 +40,7 @@ export class FinanceScene extends Phaser.Scene {
         this.updateUI();
     }
 
-    update(time: number, delta: number) {
+    update(_time: number, delta: number) {
         // Fix: Force GameManager update if paused
         // Use fixed delta to prevent NaN or huge jumps matching 60fps
         const d = delta || 16.66;
@@ -69,7 +69,7 @@ export class FinanceScene extends Phaser.Scene {
         // Actions
         const createBtn = (lx: number, ly: number, lbl: string, col: number, cb: () => void) => {
             const btn = this.add.rectangle(lx, ly, 100, 35, col).setInteractive({ useHandCursor: true });
-            const txt = this.add.text(lx, ly, lbl, { fontSize: '14px', color: '#fff' }).setOrigin(0.5);
+            this.add.text(lx, ly, lbl, { fontSize: '14px', color: '#fff' }).setOrigin(0.5);
             btn.on('pointerdown', () => { SoundManager.getInstance().play('click'); cb(); });
             btn.on('pointerover', () => btn.setAlpha(0.8));
             btn.on('pointerout', () => btn.setAlpha(1));
@@ -136,7 +136,7 @@ export class FinanceScene extends Phaser.Scene {
 
             // Checkbox
             const bg = this.add.rectangle(tx, ty, 20, 20, 0x333333).setInteractive({ useHandCursor: true });
-            const lbl = this.add.text(tx + 20, ty, res.toUpperCase(), { fontSize: '12px', color: '#bdc3c7', fontFamily: '"Roboto Mono"' }).setOrigin(0, 0.5);
+            this.add.text(tx + 20, ty, res.toUpperCase(), { fontSize: '12px', color: '#bdc3c7', fontFamily: '"Roboto Mono"' }).setOrigin(0, 0.5);
             const check = this.add.text(tx, ty, '✓', { fontSize: '16px', color: '#2ecc71' }).setOrigin(0.5); // Ref
 
             // Initial State
@@ -164,7 +164,7 @@ export class FinanceScene extends Phaser.Scene {
         // Sell Buttons
         const createSellBtn = (lx: number, ly: number, w: number, lbl: string, pct: number) => {
             const btn = this.add.rectangle(lx, ly, w, 35, 0x27ae60).setInteractive({ useHandCursor: true });
-            const t = this.add.text(lx, ly, lbl, { fontSize: '14px', color: '#fff', fontFamily: '"Noto Sans JP"' }).setOrigin(0.5);
+            this.add.text(lx, ly, lbl, { fontSize: '14px', color: '#fff', fontFamily: '"Noto Sans JP"' }).setOrigin(0.5);
             btn.on('pointerdown', () => {
                 // Cast string set to any[] for GameManager
                 const types = Array.from(this.selectedResources) as any[];
@@ -190,7 +190,7 @@ export class FinanceScene extends Phaser.Scene {
 
         const createAdj = (lx: number, txt: string, d: number) => {
             const btn = this.add.rectangle(lx, y + 240, 40, 40, 0x555555).setInteractive({ useHandCursor: true });
-            const l = this.add.text(lx, y + 240, txt, { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
+            this.add.text(lx, y + 240, txt, { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
             btn.on('pointerdown', () => {
                 const gm = GameManager.getInstance();
                 gm.autoSellThreshold = Math.max(0.0, Math.min(2.0, gm.autoSellThreshold + d));
@@ -242,7 +242,7 @@ export class FinanceScene extends Phaser.Scene {
 
         const createAdj = (lx: number, txt: string, d: number) => {
             const btn = this.add.rectangle(lx, y + 170, 40, 40, 0x555555).setInteractive({ useHandCursor: true });
-            const l = this.add.text(lx, y + 170, txt, { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
+            this.add.text(lx, y + 170, txt, { fontSize: '24px', color: '#fff' }).setOrigin(0.5);
             btn.on('pointerdown', () => {
                 const gm = GameManager.getInstance();
                 gm.miningIntensity = Math.max(1, Math.min(10, gm.miningIntensity + d));

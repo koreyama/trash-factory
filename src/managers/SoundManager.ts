@@ -26,7 +26,7 @@ export class SoundManager {
         // Update active loops? 
         // Iterate loops and ramp gain? Too complex for now. 
         // Changes take effect on next play/loop start or we can try to update live.
-        this.loops.forEach(loop => {
+        this.loops.forEach(_loop => {
             // Basic live update attempt
             // loop.gain.gain.cancelScheduledValues(this.ctx!.currentTime);
             // loop.gain.gain.setValueAtTime(loop.gain.gain.value, this.ctx!.currentTime);
