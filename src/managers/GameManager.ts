@@ -776,10 +776,10 @@ export class GameManager {
     getResourceCost(up: Upgrade): { type: ResourceType, amount: number } | null {
         if (!up.resourceCost) return null;
         if (up.level >= up.maxLevel) return null;
-        // Half initial cost and dampened scaling for resources
-        const baseAmount = up.resourceCost.amount * 0.5;
-        // Use a dampened multiplier for resource growth (30% less aggressive than money)
-        const dampenedMult = 1 + (up.costMultiplier - 1) * 0.7;
+        // Reduce base cost to 10% of the defined amount (User: too hard to get resources)
+        const baseAmount = up.resourceCost.amount * 0.1;
+        // Significantly dampen the scaling (80% less aggressive than money)
+        const dampenedMult = 1 + (up.costMultiplier - 1) * 0.2;
         const amount = Math.floor(baseAmount * Math.pow(dampenedMult, up.level));
         return { type: up.resourceCost.type, amount: Math.max(1, amount) };
     }
