@@ -66,6 +66,22 @@ export class SettingsScene extends Phaser.Scene {
         // Content Area
         this.contentContainer = this.add.container(panelX + sidebarWidth + 20, panelY + 20);
 
+        // Close Button (X) - Top Right
+        const closeBtn = this.add.text(panelX + panelWidth - 20, panelY + 20, '×', {
+            fontFamily: 'Arial',
+            fontSize: '40px',
+            color: '#ff6b6b',
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        closeBtn.on('pointerdown', () => {
+            SoundManager.getInstance().play('click');
+            this.handleClose();
+        });
+
+        closeBtn.on('pointerover', () => closeBtn.setColor('#ff9f9f'));
+        closeBtn.on('pointerout', () => closeBtn.setColor('#ff6b6b'));
+
         // Initial Render
         this.switchTab('config');
 
@@ -167,25 +183,39 @@ export class SettingsScene extends Phaser.Scene {
             SoundManager.getInstance().setVolume(val);
             gm.save();
         });
+        yPos += 50;
+
+        this.createSlider(0, yPos, 'BGM音量', gm.settings.bgmVolume, (val) => {
+            gm.settings.bgmVolume = val;
+            SoundManager.getInstance().setBgmVolume(val);
+            gm.save();
+        });
+        yPos += 50;
+
+        this.createSlider(0, yPos, '効果音音量', gm.settings.sfxVolume, (val) => {
+            gm.settings.sfxVolume = val;
+            SoundManager.getInstance().setSfxVolume(val);
+            gm.save();
+        });
         yPos += 70;
 
-        this.addHeader('グラフィック設定', yPos);
+        this.addHeader('グラフィック & ゲーム', yPos);
         yPos += 50;
 
         this.createCheckbox(0, yPos, '画面揺れ (Screen Shake)', gm.settings.screenShake, (val) => {
             gm.settings.screenShake = val;
             gm.save();
         });
-        yPos += 50;
+        yPos += 45;
 
         this.createCheckbox(0, yPos, 'パーティクル表示 (軽量化)', gm.settings.particles, (val) => {
             gm.settings.particles = val;
             gm.save();
         });
-        yPos += 50;
+        yPos += 45;
 
-        this.createCheckbox(0, yPos, 'ダメージ/テキスト表示', gm.settings.floatingText, (val) => {
-            gm.settings.floatingText = val;
+        this.createCheckbox(0, yPos, 'オートセーブ 有効', true, (_val) => {
+            // Placeholder for now
             gm.save();
         });
     }
@@ -250,9 +280,8 @@ export class SettingsScene extends Phaser.Scene {
         // Back to Title
         this.createButton(150, yPos, 'タイトルへ戻る', () => {
             SoundManager.getInstance().play('click');
-            this.scene.stop('MainScene');
-            this.scene.stop();
-            this.scene.start('TitleScene');
+            // Complete reload ensures all singletons are fresh and prevents transition freezes
+            window.location.reload();
         }, 0x636e72);
 
         yPos += 70;
@@ -262,19 +291,15 @@ export class SettingsScene extends Phaser.Scene {
             SoundManager.getInstance().play('click');
             this.showConfirmDialog();
         }, 0xe74c3c);
+    }
 
-        yPos += 150;
-
-        // Close Button (Convenience)
-        this.createButton(150, yPos, '設定を閉じる', () => {
-            SoundManager.getInstance().play('click');
-            this.scene.stop();
-            if (this.callerScene === 'MainScene') {
-                this.scene.resume('MainScene');
-            } else {
-                this.scene.resume('TitleScene');
-            }
-        }, 0x0984e3);
+    private handleClose() {
+        this.scene.stop();
+        if (this.callerScene === 'MainScene') {
+            this.scene.resume('MainScene');
+        } else {
+            this.scene.resume('TitleScene');
+        }
     }
 
     private addHeader(text: string, y: number) {
@@ -431,9 +456,8 @@ export class SettingsScene extends Phaser.Scene {
         const confirmBtn = createDialogButton(width / 2 - 100, height / 2 + 80, 'はい、削除', 0xe74c3c, () => {
             SoundManager.getInstance().play('click');
             GameManager.getInstance().resetData();
-            this.scene.stop('MainScene');
-            this.scene.stop();
-            this.scene.start('TitleScene');
+            // Definitive fix for singleton freeze: Complete Page Reload
+            window.location.reload();
         });
 
         const cancelBtn = createDialogButton(width / 2 + 100, height / 2 + 80, 'キャンセル', 0x636e72, () => {
@@ -446,4 +470,5 @@ export class SettingsScene extends Phaser.Scene {
             cancelBtn.destroy();
         });
     }
+
 }

@@ -15,6 +15,7 @@ export class MainScene extends Phaser.Scene {
     private superDrone: Drone | null = null;
     private blackHole!: BlackHole;
     private blackHoleBtn!: Phaser.GameObjects.Container;
+    private vacuumGraphics!: Phaser.GameObjects.Graphics;
 
     // Gadget State
     private gadgetCooldown: number = 0;
@@ -410,13 +411,7 @@ export class MainScene extends Phaser.Scene {
 
         // 4. Inventory Bar
         this.createInventoryBar();
-        // Hidden Game Trigger (R key)
-        if (this.input.keyboard) {
-            this.input.keyboard.on('keydown-R', () => {
-                console.log("Entering Hidden Mode...");
-                this.scene.start('RoguelikeScene', { startLevel: 1 });
-            });
-        }
+
 
     }
 
@@ -523,6 +518,8 @@ export class MainScene extends Phaser.Scene {
             const vacUp = gm.getUpgrade('vacuum_unlock');
             if (pointer.rightButtonDown() && vacUp && vacUp.level > 0) {
                 this.handleVacuum(pointer);
+            } else {
+                if (this.vacuumGraphics) this.vacuumGraphics.clear();
             }
         }
 
@@ -738,12 +735,23 @@ export class MainScene extends Phaser.Scene {
         const gm = GameManager.getInstance();
         // Base stats from GM
         let radius = gm.vacuumRange;
-        let force = gm.vacuumPower * 0.2; // Drastically reduced to prevent "explosion" feel
+        let force = gm.vacuumPower * 1.5; // Boosted force
 
-        // Visual Feedback (physics only for now)
+        // Visual Feedback: Draw Range
+        if (!this.vacuumGraphics) {
+            this.vacuumGraphics = this.add.graphics();
+            this.vacuumGraphics.setDepth(2000);
+        }
+        this.vacuumGraphics.clear();
+        this.vacuumGraphics.lineStyle(2, 0x00ccff, 0.5);
+        this.vacuumGraphics.strokeCircle(pointer.worldX, pointer.worldY, radius);
+        this.vacuumGraphics.fillStyle(0x00ccff, 0.1);
+        this.vacuumGraphics.fillCircle(pointer.worldX, pointer.worldY, radius);
+
+        // Physics
         const bodies = this.matter.world.getAllBodies();
         bodies.forEach((b: any) => {
-            if (b.gameObject && b.gameObject instanceof Trash && !b.isStatic) {
+            if (b.gameObject && b.gameObject instanceof Trash && !b.isStatic && !b.gameObject.isDestroyed) {
                 const trash = b.gameObject;
                 const dist = Phaser.Math.Distance.Between(pointer.worldX, pointer.worldY, trash.x, trash.y);
 
@@ -1183,8 +1191,12 @@ export class MainScene extends Phaser.Scene {
     }
 
     private createSideButtons() {
+        let currentY = 20;
+        const gap = 50;
+        const x = 350;
+
         // 1. Skill Tree - Always there
-        const btn = this.add.text(350, 20, '設備強化 >', Theme.styles.buttonText)
+        const btn = this.add.text(x, currentY, '設備強化 >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
             .on('pointerdown', () => {
@@ -1199,9 +1211,10 @@ export class MainScene extends Phaser.Scene {
         });
         btn.on('pointerout', () => btn.setColor(Theme.colors.text));
         this.sideButtons.push(btn);
+        currentY += gap;
 
         // 2. Achievement - Always there
-        const achBtn = this.add.text(350, 70, '実績リスト >', Theme.styles.buttonText)
+        const achBtn = this.add.text(x, currentY, '実績リスト >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
             .on('pointerdown', () => {
@@ -1216,9 +1229,10 @@ export class MainScene extends Phaser.Scene {
         });
         achBtn.on('pointerout', () => achBtn.setColor(Theme.colors.text));
         this.sideButtons.push(achBtn);
+        currentY += gap;
 
         // 3. Settings - Always there
-        const settingsBtn = this.add.text(350, 120, '設定 >', Theme.styles.buttonText)
+        const settingsBtn = this.add.text(x, currentY, '設定 >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
             .on('pointerdown', () => {
@@ -1233,51 +1247,10 @@ export class MainScene extends Phaser.Scene {
         });
         settingsBtn.on('pointerout', () => settingsBtn.setColor(Theme.colors.text));
         this.sideButtons.push(settingsBtn);
+        currentY += gap;
 
-        const gm = GameManager.getInstance();
-
-        // 4. Crafting
-        const craftingUp = gm.getUpgrade('unlock_crafting');
-        if (craftingUp && craftingUp.level > 0) {
-            const craftBtn = this.add.text(350, 170, 'クラフト >', Theme.styles.buttonText)
-                .setInteractive({ useHandCursor: true })
-                .setDepth(1000)
-                .on('pointerdown', () => {
-                    SoundManager.getInstance().play('click');
-                    this.scene.pause();
-                    this.scene.launch('CraftingScene');
-                });
-
-            craftBtn.on('pointerover', () => {
-                SoundManager.getInstance().play('hover');
-                craftBtn.setColor(Theme.colors.accent);
-            });
-            craftBtn.on('pointerout', () => craftBtn.setColor(Theme.colors.text));
-            this.sideButtons.push(craftBtn);
-        }
-
-        // 5. Finance
-        const financeUp = gm.getUpgrade('compound_interest');
-        if (financeUp && financeUp.level > 0) {
-            const financeBtn = this.add.text(350, 220, '資産運用 >', Theme.styles.buttonText)
-                .setInteractive({ useHandCursor: true })
-                .setDepth(1000)
-                .on('pointerdown', () => {
-                    SoundManager.getInstance().play('click');
-                    this.scene.pause();
-                    this.scene.launch('FinanceScene');
-                });
-
-            financeBtn.on('pointerover', () => {
-                SoundManager.getInstance().play('hover');
-                financeBtn.setColor(Theme.colors.accent);
-            });
-            financeBtn.on('pointerout', () => financeBtn.setColor(Theme.colors.text));
-            this.sideButtons.push(financeBtn);
-        }
-
-        // 6. Facilities Manager (Config)
-        const facilitiesBtn = this.add.text(350, 270, '設備管理 >', Theme.styles.buttonText)
+        // 4. Facilities Manager - Requested 4th
+        const facilitiesBtn = this.add.text(x, currentY, '設備管理 >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
             .on('pointerdown', () => {
@@ -1292,16 +1265,38 @@ export class MainScene extends Phaser.Scene {
         });
         facilitiesBtn.on('pointerout', () => facilitiesBtn.setColor(Theme.colors.text));
         this.sideButtons.push(facilitiesBtn);
+        currentY += gap;
 
-        // 7. Refinery Scene (Actual Processing) - Only if Conveyor unlocked
-        if (gm.conveyorUnlocked) {
-            const refineryBtn = this.add.text(350, 320, '処理施設へ >', Theme.styles.buttonText)
+        const gm = GameManager.getInstance();
+
+        // 5. Crafting - Requested 5th
+        const craftingUp = gm.getUpgrade('unlock_crafting');
+        if (craftingUp && craftingUp.level > 0) {
+            const craftBtn = this.add.text(x, currentY, 'クラフト >', Theme.styles.buttonText)
                 .setInteractive({ useHandCursor: true })
                 .setDepth(1000)
                 .on('pointerdown', () => {
                     SoundManager.getInstance().play('click');
-                    // Stop or Pause? Typically stop main to go to separate view,
-                    // but RefugeeScene.ts uses 'scene.resume' for return, implying pause here.
+                    this.scene.pause();
+                    this.scene.launch('CraftingScene');
+                });
+
+            craftBtn.on('pointerover', () => {
+                SoundManager.getInstance().play('hover');
+                craftBtn.setColor(Theme.colors.accent);
+            });
+            craftBtn.on('pointerout', () => craftBtn.setColor(Theme.colors.text));
+            this.sideButtons.push(craftBtn);
+            currentY += gap;
+        }
+
+        // 6. Refinery Scene - Requested 6th
+        if (gm.conveyorUnlocked) {
+            const refineryBtn = this.add.text(x, currentY, '処理施設へ >', Theme.styles.buttonText)
+                .setInteractive({ useHandCursor: true })
+                .setDepth(1000)
+                .on('pointerdown', () => {
+                    SoundManager.getInstance().play('click');
                     this.scene.pause();
                     this.scene.launch('RefineryScene');
                 });
@@ -1312,8 +1307,29 @@ export class MainScene extends Phaser.Scene {
             });
             refineryBtn.on('pointerout', () => refineryBtn.setColor(Theme.colors.text));
             this.sideButtons.push(refineryBtn);
+            currentY += gap;
         }
 
+        // 7. Finance - Requested 7th
+        const financeUp = gm.getUpgrade('compound_interest');
+        if (financeUp && financeUp.level > 0) {
+            const financeBtn = this.add.text(x, currentY, '資産運用 >', Theme.styles.buttonText)
+                .setInteractive({ useHandCursor: true })
+                .setDepth(1000)
+                .on('pointerdown', () => {
+                    SoundManager.getInstance().play('click');
+                    this.scene.pause();
+                    this.scene.launch('FinanceScene');
+                });
+
+            financeBtn.on('pointerover', () => {
+                SoundManager.getInstance().play('hover');
+                financeBtn.setColor(Theme.colors.accent);
+            });
+            financeBtn.on('pointerout', () => financeBtn.setColor(Theme.colors.text));
+            this.sideButtons.push(financeBtn);
+            currentY += gap;
+        }
     }
 
 

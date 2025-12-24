@@ -233,6 +233,11 @@ export class SkillTreeScene extends Phaser.Scene {
                 SoundManager.getInstance().play('click');
                 this.refreshAllNodes(); // Update ALL nodes (unlocks children, updates affordability colors)
                 this.updateHUD();
+
+                if (upgrade.id === 'mars_colony') {
+                    this.hideTooltip(); // Hide tooltip to prevent overlap
+                    this.showDiscoveryDialog();
+                }
             } else {
                 SoundManager.getInstance().play('error');
             }
@@ -337,10 +342,17 @@ export class SkillTreeScene extends Phaser.Scene {
         const lvText = `Lv.${upgrade.level} / ${maxLvText}`;
         const costText = cost === Infinity ? 'MAX' : `¥${cost.toLocaleString()}`;
 
+        let resourceText = '';
+        const resCost = gm.getResourceCost(upgrade);
+        if (resCost) {
+            const rName = this.getResourceName(resCost.type);
+            resourceText = `\n必要: ${rName} ${resCost.amount.toLocaleString()}個`;
+        }
+
         // Dynamic height based on description
         const descHeight = desc.height;
         const infoY = 50 + descHeight;
-        const tooltipHeight = infoY + 35;
+        const tooltipHeight = infoY + 35 + (resourceText ? 25 : 0);
 
         const bg = this.add.graphics();
         bg.fillStyle(0x000000, 0.95);
@@ -348,7 +360,7 @@ export class SkillTreeScene extends Phaser.Scene {
         bg.lineStyle(1, 0x74b9ff, 0.5);
         bg.strokeRoundedRect(0, 0, tooltipWidth, tooltipHeight, 8);
 
-        const info = this.add.text(10, infoY, `${lvText}  |  ${costText}`, {
+        const info = this.add.text(10, infoY, `${lvText}  |  ${costText}${resourceText}`, {
             fontFamily: '"Roboto Mono", monospace',
             fontSize: '14px',
             color: '#74b9ff'
@@ -360,5 +372,70 @@ export class SkillTreeScene extends Phaser.Scene {
 
     private hideTooltip() {
         this.tooltipUI.setVisible(false);
+    }
+
+    private getResourceName(type: string): string {
+        switch (type) {
+            case 'money': return '資金';
+            case 'plastic': return 'プラ';
+            case 'metal': return '金属';
+            case 'circuit': return '基板';
+            case 'bioCell': return 'バイオ';
+            case 'rareMetal': return 'レアM';
+            case 'radioactive': return '放射能';
+            case 'darkMatter': return 'DM';
+            case 'quantumCrystal': return 'QC';
+            default: return type;
+        }
+    }
+
+    private showDiscoveryDialog() {
+        const { width, height } = this.scale;
+
+        const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8).setDepth(2000).setInteractive();
+        const dialog = this.add.container(width / 2, height / 2).setDepth(2001);
+
+        const bg = this.add.graphics();
+        bg.fillStyle(0x0f0f1a, 1);
+        bg.lineStyle(2, 0x00d2d3, 1);
+        bg.fillRoundedRect(-350, -250, 700, 500, 15);
+        bg.strokeRoundedRect(-350, -250, 700, 500, 15);
+
+        const title = this.add.text(0, -180, '!! 隠しモード発見 !!', {
+            fontFamily: '"Orbitron", "Noto Sans JP", sans-serif',
+            fontSize: '36px',
+            color: '#ffd700',
+            fontStyle: 'bold',
+            stroke: '#000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+
+        const msg = this.add.text(0, 0, '火星への到達により、世界の真理が明かされました。\n\n【アクセス方法】\n「実績リスト」を開き、一番上の実績（一歩目）を\n10回連続でクリックしてください。\n禁断の「ハックモード」が起動します。', {
+            fontFamily: '"Noto Sans JP", sans-serif',
+            fontSize: '20px',
+            color: '#ffffff',
+            align: 'center',
+            lineSpacing: 16,
+            wordWrap: { width: 600 }
+        }).setOrigin(0.5);
+
+        const btnBg = this.add.graphics();
+        btnBg.fillStyle(0x00d2d3, 1);
+        btnBg.fillRoundedRect(-120, 150, 240, 60, 10);
+
+        const btnText = this.add.text(0, 180, '了解', {
+            fontFamily: '"Noto Sans JP", sans-serif',
+            fontSize: '24px',
+            color: '#000000',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        const hitArea = this.add.rectangle(0, 180, 240, 60, 0, 0).setInteractive({ useHandCursor: true });
+        hitArea.on('pointerdown', () => {
+            overlay.destroy();
+            dialog.destroy();
+        });
+
+        dialog.add([bg, title, msg, btnBg, btnText, hitArea]);
     }
 }

@@ -11,9 +11,6 @@ export class TitleScene extends Phaser.Scene {
         // Background
         this.cameras.main.setBackgroundColor('#1a1a2e');
 
-        // Decorative grid
-        this.add.grid(width / 2, height / 2, width, height, 50, 50, undefined, undefined, 0x16213e, 0.3);
-
         // Title
         this.add.text(width / 2, height * 0.3, 'TRASH FACTORY', {
             fontFamily: '"Orbitron", sans-serif',
