@@ -10,6 +10,7 @@ import { StageSelectScene } from './scenes/StageSelectScene';
 import { RoguelikeScene } from './scenes/RoguelikeScene';
 import { RefineryScene } from './scenes/RefineryScene';
 import { FinanceScene } from './scenes/FinanceScene';
+import { FacilitiesScene } from './scenes/FacilitiesScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.WEBGL, // Force WebGL for GPU acceleration (was AUTO)
@@ -29,7 +30,7 @@ const config: Phaser.Types.Core.GameConfig = {
       constraintIterations: 1, // Default is 2
     }
   },
-  scene: [TitleScene, MainScene, SkillTreeScene, AchievementScene, CraftingScene, SettingsScene, StageSelectScene, RoguelikeScene, RefineryScene, FinanceScene],
+  scene: [TitleScene, MainScene, SkillTreeScene, AchievementScene, CraftingScene, SettingsScene, StageSelectScene, RoguelikeScene, RefineryScene, FinanceScene, FacilitiesScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH

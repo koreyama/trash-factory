@@ -1123,8 +1123,11 @@ export class RoguelikeScene extends Phaser.Scene {
 
             let ex, ey;
             if (forceOnScreen) {
-                ex = width / 2 + 100;
+                // Fixed position but safer distance (400px to right)
+                ex = width / 2 + 400;
                 ey = height / 2;
+                // Clamp to screen bounds
+                if (ex > width - 50) ex = width - 50;
             } else {
                 // 壁の内側（100px〜）かつプレイヤーから離れた位置
                 let attempts = 0;
@@ -1665,7 +1668,7 @@ export class RoguelikeScene extends Phaser.Scene {
             bg.on('pointerdown', () => {
                 const gm = GameManager.getInstance();
                 if (r.id === 'money') {
-                    gm.rogueGold += r.amount!;
+                    gm.addMoney(r.amount!); // Changed from rogueGold to real Money
                 } else if (r.id === 'resource') {
                     gm.addResource('plastic', r.plastic!);
                     gm.addResource('metal', r.metal!);

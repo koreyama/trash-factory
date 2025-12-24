@@ -79,8 +79,8 @@ export class SkillTreeScene extends Phaser.Scene {
             this.container.add(node);
         });
 
-        // Center on Root initially (0,0) with some offset usually
-        this.container.setPosition(width / 2, height - 150);
+        // Center on Root (0,0) at the middle of the screen
+        this.container.setPosition(width / 2, height / 2);
 
         // Zoom Setup (Container Scale)
         this.input.on('wheel', (_pointer: any, _gameObjects: any, _deltaX: number, deltaY: number) => {

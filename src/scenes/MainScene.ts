@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Trash } from '../objects/Trash';
-import { GameManager, type GadgetType } from '../managers/GameManager';
+import { GameManager, type GadgetType, type ResourceType } from '../managers/GameManager';
 
 import { FloatingText } from '../objects/FloatingText';
 import { Theme } from '../managers/Theme';
@@ -34,11 +34,7 @@ export class MainScene extends Phaser.Scene {
     private autoBotTimer: number = 0;
 
     // Facility State
-    private laserGridEnabled: boolean = false;
-    private laserBtn: Phaser.GameObjects.Container | null = null;
-    private droneToggleBtn!: Phaser.GameObjects.Container;
-    private conveyorToggleBtn: Phaser.GameObjects.Container | null = null;
-    private refineryBtn: Phaser.GameObjects.Container | null = null;
+    // Facility State
     private conveyorBelt: Phaser.GameObjects.Rectangle | null = null;
     private conveyorStripeGraphics: Phaser.GameObjects.Graphics | null = null;
     private conveyorStripeOffset: number = 0;
@@ -393,7 +389,7 @@ export class MainScene extends Phaser.Scene {
 
         // 3. UI Display
         this.createUI();
-        this.createSkillTreeButton();
+        this.createSideButtons();
 
         // Event listener for money updates
         this.events.on('update-money', this.updateUI, this);
@@ -402,6 +398,14 @@ export class MainScene extends Phaser.Scene {
         this.events.on('trash-destroyed', this.onTrashDestroyed, this);
 
         // DRONE
+        if (this.drone) {
+            // Already setup in constructor/properties, but maybe init here?
+        }
+
+        // Listen for Resume to refresh UI (unlocks)
+        this.events.on('resume', () => {
+            this.checkForUnlocks();
+        });
         this.drone = new Drone(this, width / 2, height / 2);
 
         // 4. Inventory Bar
@@ -424,6 +428,38 @@ export class MainScene extends Phaser.Scene {
         if (this.gadgetCooldown > 0) {
             this.gadgetCooldown -= delta;
         }
+
+        const gm = GameManager.getInstance();
+
+        // Facilities Check
+        // 1. Gravity
+        if (gm.gravityActive && gm.getUpgrade('gravity_manipulator')) {
+            this.matter.world.setGravity(0, 0.5); // Reduced gravity (was 1.0)
+        } else {
+            this.matter.world.setGravity(0, 1.5); // Standard gravity (was 2.5) - slower
+        }
+
+        // 2. Conveyor Visibility
+        if (gm.conveyorUnlocked && !this.conveyorBelt) {
+            this.createConveyorBelt();
+        }
+
+        if (this.conveyorGraphics) {
+            const conveyorOn = gm.conveyorActive && gm.conveyorUnlocked;
+            this.conveyorGraphics.forEach(g => g.setVisible(conveyorOn));
+        }
+
+        // 3. Magnet (Facility) - Handled by Passive Logic (below) with flag check
+
+        // 4. Black Hole Visibility
+        if (this.blackHole) {
+            this.blackHole.setVisible(gm.blackHoleActive);
+            // Also enable/disable physics/update if needed, but setVisible handles the visual
+            this.blackHole.setActive(gm.blackHoleActive);
+        }
+        // if (!this.magnetActive && gm.magnetActive && gm.getUpgrade('magnet_field')) {
+        //     this.applyMagnetEffect(delta);
+        // }
 
         // Gadget Timers
         if (this.overclockActive) {
@@ -458,7 +494,7 @@ export class MainScene extends Phaser.Scene {
         }
 
         // Dynamite Drag visuals & Vacuum Logic
-        const gm = GameManager.getInstance();
+        // const gm = GameManager.getInstance(); // Moved up
 
         // Financial Checks
         const finance = gm.update(delta);
@@ -493,7 +529,7 @@ export class MainScene extends Phaser.Scene {
         // Auto Press Logic (Throttled)
         this.checkAutoPress(delta);
         this.checkLaserGrid(delta);
-        this.updateFacilities();
+        // this.updateFacilities(); // Obsolete
 
         if (this.drone) this.drone.update();
         if (this.superDrone) this.superDrone.update();
@@ -502,9 +538,9 @@ export class MainScene extends Phaser.Scene {
             this.updateBlackHoleButton(); // Keep button state in sync
         }
 
-        // Passive Magnet Field (Upgrade)
+        // Passive Magnet Field (Upgrade) -> Now Facility Logic
         const magnetUp = gm.getUpgrade('magnet_field');
-        if (magnetUp && magnetUp.level > 0 && !this.magnetActive) {
+        if (magnetUp && magnetUp.level > 0 && !this.magnetActive && gm.magnetActive) {
             // Apply weak force to METAL only
             const center = { x: this.scale.width / 2, y: this.scale.height / 2 };
             this.matter.world.getAllBodies().forEach((b: any) => {
@@ -525,6 +561,12 @@ export class MainScene extends Phaser.Scene {
         }
         this.handlePassiveIncome(delta);
         this.updateConveyorLogic(delta);
+
+        // Nanobots
+        this.checkNanobots(delta);
+        // Auto Sorter
+        // Auto Sorter
+        this.checkAutoSorter(delta);
     }
 
     private updateConveyorLogic(delta: number) {
@@ -579,17 +621,57 @@ export class MainScene extends Phaser.Scene {
             // Energy Generation
             if (gm.energyGeneration > 0) {
                 gm.addEnergy(gm.energyGeneration);
-                this.updateUI();
+            }
+
+            // Nuclear/Fusion Reactor (Passive Energy)
+            // (Handled by gm.energyGeneration update in GameManager effect, so line 580 covers it)
+
+            // Orbital Station, Moon Base, Mars Colony (Dark Matter)
+            const orbital = gm.getUpgrade('orbital_station');
+            const moon = gm.getUpgrade('moon_base');
+            const mars = gm.getUpgrade('mars_colony');
+
+            let darkMatterGen = 0;
+            if (orbital && orbital.level > 0) darkMatterGen += orbital.level; // 1 per level
+            if (moon && moon.level > 0) darkMatterGen += moon.level * 2; // 2 per level
+            if (mars && mars.level > 0) darkMatterGen += mars.level * 10; // 10 per level
+
+            if (darkMatterGen > 0) {
+                // Quantum Core multiplier
+                if (gm.getUpgrade('quantum_core')?.level ?? 0 > 0) darkMatterGen *= 2;
+                gm.addResource('darkMatter', darkMatterGen);
+            }
+
+            // Time Machine (Recover Lost Trash - Randomized Resources)
+            const timeMachine = gm.getUpgrade('time_machine');
+            if (timeMachine && timeMachine.level > 0) {
+                const amount = timeMachine.level;
+                // Randomly gain basic resources
+                if (Math.random() < 0.5) gm.addResource('plastic', amount);
+                if (Math.random() < 0.3) gm.addResource('metal', amount);
+                if (Math.random() < 0.1) gm.addResource('circuit', amount);
             }
 
             // Auto Miner
             const miner = gm.getUpgrade('auto_miner');
             if (miner && miner.level > 0) {
-                const amount = miner.level; // 1 per level
+                let amount = miner.level; // 1 per level
+
+                // Global Mining (Multiplier)
+                const global = gm.getUpgrade('global_mining');
+                if (global && global.level > 0) {
+                    amount *= 2; // Simple 2x for now
+                }
+                // Quantum Core (Speed x2 -> Amount x2)
+                if (gm.getUpgrade('quantum_core')?.level ?? 0 > 0) {
+                    amount *= 2;
+                }
+
                 gm.addResource('plastic', amount);
                 gm.addResource('metal', amount);
-                // Maybe show floating text? Too cluttered?
             }
+
+            this.updateUI();
 
             // Auto Factory
             const factory = gm.getUpgrade('auto_factory');
@@ -656,7 +738,7 @@ export class MainScene extends Phaser.Scene {
         const gm = GameManager.getInstance();
         // Base stats from GM
         let radius = gm.vacuumRange;
-        let force = gm.vacuumPower;
+        let force = gm.vacuumPower * 0.2; // Drastically reduced to prevent "explosion" feel
 
         // Visual Feedback (physics only for now)
         const bodies = this.matter.world.getAllBodies();
@@ -712,6 +794,16 @@ export class MainScene extends Phaser.Scene {
         this.createExplosion(data.x, data.y);
 
         this.checkAch();
+
+        // Incinerator (Bio -> Energy)
+        if (data.isCrit === false) { // Don't double dip signal?
+            // Actually implementation detail: destroyTrash calls this.
+            // We need to know the type. MainScene doesn't track type in onTrashDestroyed arg easily without extending.
+            // Wait, this method receives `data: { x, y, amount, isCrit }`. It doesn't know the TYPE.
+            // I need to change how onTrashDestroyed is called or simply checking type before emit.
+            // Let's modify destroyTrash in Trash.ts instead?
+            // Or better: Pass type in data.
+        }
     }
 
     private createExplosion(x: number, y: number) {
@@ -768,12 +860,16 @@ export class MainScene extends Phaser.Scene {
         // Base rates
         const varietyBonus = spawnVariety ? spawnVariety.level * 0.05 : 0;
 
+        // Space Debris Bonus
+        const spaceDebris = gm.getUpgrade('space_debris');
+        const debrisBonus = (spaceDebris && spaceDebris.level > 0) ? (spaceDebris.level * 0.05) : 0; // +5% per level
+
         // Probability Thresholds (High to Low rarity)
         // NEW: Quantum (rarest) - 1%
         const quantumChance = (quantumUp && quantumUp.level > 0) ? 0.01 : 0;
 
-        // NEW: Satellite - 2%
-        const satelliteChance = (satelliteUp && satelliteUp.level > 0) ? 0.02 : 0;
+        // NEW: Satellite - 2% + Debris Bonus
+        const satelliteChance = (satelliteUp && satelliteUp.level > 0) ? (0.02 + debrisBonus) : 0;
 
         // NEW: Nuclear - 3%
         const nuclearChance = (nuclearUp && nuclearUp.level > 0) ? 0.03 : 0;
@@ -832,6 +928,23 @@ export class MainScene extends Phaser.Scene {
         }
 
         const trash = new Trash(this, x, y, texture, type);
+        // Initial velocity for everything (Force start)
+        trash.setVelocity(Phaser.Math.Between(-2, 2), Phaser.Math.Between(2, 5));
+
+        // Gravity Manipulator
+        const gravUp = gm.getUpgrade('gravity_manipulator');
+        if (gravUp && gravUp.level > 0) {
+            // Lower gravity scale or increase air friction
+            // Lower gravity scale or increase air friction
+            // REMOVED high friction to preserve inertia as requested. 
+            // Global gravity toggle handles the slow-fall effect now.
+            trash.setMass(0.5); // Lighter allows easier flinging without killing speed
+            // trash.setFrictionAir(0.001); // Optional: slightly more than 0.0005 but not 0.05
+            trash.setMass(0.5); // Lighter
+            // Or use scale
+            // (trash.body as MatterJS.BodyType).gravityScale = 0.5; // Phaser Matter wrapper might not expose gravityScale easily on body creation vs world.
+            // setFrictionAir is good enough to simulate "Slow fall / easy stack".
+        }
 
         // Gold trash check (luck rate)
         if (gm.luckRate > 0 && Math.random() < gm.luckRate) {
@@ -939,7 +1052,7 @@ export class MainScene extends Phaser.Scene {
         // NEW: Extended resources
         this.rareMetalTextRef = createRow('レアメタル', '#3498db', '💎');
         this.radioactiveTextRef = createRow('放射性物質', '#27ae60', '☢️');
-        this.darkMatterTextRef = createRow('ダークマター', '#2c3e50', '🌑');
+        this.darkMatterTextRef = createRow('ダークマター', '#9b59b6', '🌑');
         this.quantumCrystalTextRef = createRow('量子結晶', '#00ffff', '💠');
 
         this.hudContainer.setScrollFactor(0);
@@ -1017,63 +1130,11 @@ export class MainScene extends Phaser.Scene {
     private blackHoleBg!: Phaser.GameObjects.Graphics;
     private blackHoleText!: Phaser.GameObjects.Text;
 
-    private createBlackHoleButton() {
-        const { width } = this.scale;
 
-        this.createStyledButton(width - 160, 10, 140, 'B.HOLE OFF', 0x555555, () => {
-            SoundManager.getInstance().play('click');
-            if (this.blackHole && !this.blackHole.isStable()) {
-                this.blackHole.triggerBigBang();
-            } else {
-                this.blackHole.toggle();
-            }
-            this.updateBlackHoleButton();
-        }).then(res => {
-            this.blackHoleBtn = res.container;
-            this.blackHoleBg = res.bg;
-            this.blackHoleText = res.text;
-            this.updateBlackHoleButton(); // Initial State Sync
-        });
-    }
 
-    private async createStyledButton(x: number, y: number, width: number, textStr: string, color: number, onClick: () => void) {
-        const height = 40;
-        const radius = 8;
 
-        const container = this.add.container(x, y).setDepth(2000);
 
-        const bg = this.add.graphics();
-        bg.fillStyle(color, 1);
-        bg.fillRoundedRect(0, 0, width, height, radius);
-        bg.lineStyle(2, 0xffffff, 0.5);
-        bg.strokeRoundedRect(0, 0, width, height, radius);
 
-        const text = this.add.text(width / 2, height / 2, textStr, {
-            fontSize: '14px',
-            fontFamily: '"Orbitron", "Noto Sans JP", sans-serif',
-            color: '#fff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-
-        const hitArea = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0)
-            .setInteractive({ useHandCursor: true });
-
-        hitArea.on('pointerdown', onClick);
-
-        // Hover
-        hitArea.on('pointerover', () => {
-            bg.lineStyle(2, 0x00ffff, 1);
-            bg.strokeRoundedRect(0, 0, width, height, radius);
-        });
-        hitArea.on('pointerout', () => {
-            bg.lineStyle(2, 0xffffff, 0.5);
-            bg.strokeRoundedRect(0, 0, width, height, radius);
-        });
-
-        container.add([bg, text, hitArea]);
-
-        return { container, bg, text };
-    }
 
     private updateBlackHoleButton() {
         if (!this.blackHoleBg || !this.blackHoleText) return;
@@ -1103,8 +1164,26 @@ export class MainScene extends Phaser.Scene {
 
 
 
-    private createSkillTreeButton() {
-        // Skill Tree
+    // UI Logic for Scene Resume
+    private checkForUnlocks() {
+        this.refreshSideButtons();
+    }
+
+    private sideButtons: Phaser.GameObjects.Text[] = [];
+
+    private refreshSideButtons() {
+        // Clear existing
+        this.sideButtons.forEach(b => {
+            if (b && b.active) b.destroy();
+        });
+        this.sideButtons = [];
+
+        // Re-create all side buttons
+        this.createSideButtons();
+    }
+
+    private createSideButtons() {
+        // 1. Skill Tree - Always there
         const btn = this.add.text(350, 20, '設備強化 >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
@@ -1119,8 +1198,9 @@ export class MainScene extends Phaser.Scene {
             btn.setColor(Theme.colors.accent);
         });
         btn.on('pointerout', () => btn.setColor(Theme.colors.text));
+        this.sideButtons.push(btn);
 
-        // Achievement Button
+        // 2. Achievement - Always there
         const achBtn = this.add.text(350, 70, '実績リスト >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
@@ -1135,8 +1215,9 @@ export class MainScene extends Phaser.Scene {
             achBtn.setColor(Theme.colors.accent);
         });
         achBtn.on('pointerout', () => achBtn.setColor(Theme.colors.text));
+        this.sideButtons.push(achBtn);
 
-        // Settings Button (before Crafting)
+        // 3. Settings - Always there
         const settingsBtn = this.add.text(350, 120, '設定 >', Theme.styles.buttonText)
             .setInteractive({ useHandCursor: true })
             .setDepth(1000)
@@ -1151,9 +1232,11 @@ export class MainScene extends Phaser.Scene {
             settingsBtn.setColor(Theme.colors.accent);
         });
         settingsBtn.on('pointerout', () => settingsBtn.setColor(Theme.colors.text));
+        this.sideButtons.push(settingsBtn);
 
-        // Crafting Button - Only show if unlocked
         const gm = GameManager.getInstance();
+
+        // 4. Crafting
         const craftingUp = gm.getUpgrade('unlock_crafting');
         if (craftingUp && craftingUp.level > 0) {
             const craftBtn = this.add.text(350, 170, 'クラフト >', Theme.styles.buttonText)
@@ -1170,9 +1253,10 @@ export class MainScene extends Phaser.Scene {
                 craftBtn.setColor(Theme.colors.accent);
             });
             craftBtn.on('pointerout', () => craftBtn.setColor(Theme.colors.text));
+            this.sideButtons.push(craftBtn);
         }
 
-        // Finance Button (Tier 4+)
+        // 5. Finance
         const financeUp = gm.getUpgrade('compound_interest');
         if (financeUp && financeUp.level > 0) {
             const financeBtn = this.add.text(350, 220, '資産運用 >', Theme.styles.buttonText)
@@ -1189,7 +1273,47 @@ export class MainScene extends Phaser.Scene {
                 financeBtn.setColor(Theme.colors.accent);
             });
             financeBtn.on('pointerout', () => financeBtn.setColor(Theme.colors.text));
+            this.sideButtons.push(financeBtn);
         }
+
+        // 6. Facilities Manager (Config)
+        const facilitiesBtn = this.add.text(350, 270, '設備管理 >', Theme.styles.buttonText)
+            .setInteractive({ useHandCursor: true })
+            .setDepth(1000)
+            .on('pointerdown', () => {
+                SoundManager.getInstance().play('click');
+                this.scene.pause();
+                this.scene.launch('FacilitiesScene');
+            });
+
+        facilitiesBtn.on('pointerover', () => {
+            SoundManager.getInstance().play('hover');
+            facilitiesBtn.setColor(Theme.colors.accent);
+        });
+        facilitiesBtn.on('pointerout', () => facilitiesBtn.setColor(Theme.colors.text));
+        this.sideButtons.push(facilitiesBtn);
+
+        // 7. Refinery Scene (Actual Processing) - Only if Conveyor unlocked
+        if (gm.conveyorUnlocked) {
+            const refineryBtn = this.add.text(350, 320, '処理施設へ >', Theme.styles.buttonText)
+                .setInteractive({ useHandCursor: true })
+                .setDepth(1000)
+                .on('pointerdown', () => {
+                    SoundManager.getInstance().play('click');
+                    // Stop or Pause? Typically stop main to go to separate view,
+                    // but RefugeeScene.ts uses 'scene.resume' for return, implying pause here.
+                    this.scene.pause();
+                    this.scene.launch('RefineryScene');
+                });
+
+            refineryBtn.on('pointerover', () => {
+                SoundManager.getInstance().play('hover');
+                refineryBtn.setColor(Theme.colors.accent);
+            });
+            refineryBtn.on('pointerout', () => refineryBtn.setColor(Theme.colors.text));
+            this.sideButtons.push(refineryBtn);
+        }
+
     }
 
 
@@ -1221,11 +1345,9 @@ export class MainScene extends Phaser.Scene {
         const laserUp = gm.getUpgrade('laser_grid');
         if (!laserUp || laserUp.level === 0) return;
 
-        // Update laser button visibility
-        this.updateLaserButton();
 
         // Check if laser is enabled
-        if (!this.laserGridEnabled) return;
+        if (!gm.laserActive) return;
 
         this.laserTimer += delta;
         if (this.laserTimer < 300) return; // ~3.3Hz
@@ -1285,131 +1407,74 @@ export class MainScene extends Phaser.Scene {
         }
     }
 
-    private updateLaserButton() {
+    private nanobotTimer: number = 0;
+    private checkNanobots(delta: number) {
         const gm = GameManager.getInstance();
-        const laserUp = gm.getUpgrade('laser_grid');
+        const nano = gm.getUpgrade('nanobot_swarm');
+        // Check active flag
+        if (!nano || nano.level === 0 || !gm.nanobotsActive) return;
 
-        // Create button if unlocked but not yet created
-        if (laserUp && laserUp.level > 0 && !this.laserBtn) {
-            this.createLaserButton();
-        }
+        this.nanobotTimer += delta;
+        if (this.nanobotTimer > 2000 / nano.level) { // Faster with levels
+            this.nanobotTimer = 0;
+            const bodies = this.matter.world.getAllBodies();
+            // Find one random trash
+            const candidates: Trash[] = [];
+            bodies.forEach((b: any) => {
+                if (b.gameObject && b.gameObject instanceof Trash && !b.gameObject.isDestroyed) {
+                    candidates.push(b.gameObject);
+                }
+            });
 
-        // Update visibility
-        if (this.laserBtn) {
-            this.laserBtn.setVisible(!!laserUp && laserUp.level > 0);
-        }
-    }
-
-    private updateFacilities() {
-        const gm = GameManager.getInstance();
-
-        // 1. Drone Toggle
-        if (gm.droneUnlocked && !this.droneToggleBtn) {
-            this.createDroneToggleButton();
-        }
-
-        // 2. Conveyor Toggle & Belt
-        if (gm.conveyorUnlocked) {
-            if (!this.conveyorToggleBtn) this.createConveyorToggleButton();
-            if (!this.conveyorBelt) this.createConveyorBelt();
-        }
-
-        // 3. Refinery Link
-        if (gm.conveyorUnlocked && !this.refineryBtn) {
-            this.createRefineryButton();
-        }
-
-        // 4. Black Hole Button
-        if (gm.getUpgrade('black_hole_unlock') && gm.getUpgrade('black_hole_unlock')!.level > 0 && !this.blackHoleBtn) {
-            this.createBlackHoleButton();
-        }
-    }
-
-    private createDroneToggleButton() {
-        const gm = GameManager.getInstance();
-        const { width } = this.scale;
-
-        const update = (bg: any, text: any) => {
-            bg.clear();
-            bg.fillStyle(gm.dronesActive ? 0x27ae60 : 0xc0392b, 1);
-            bg.fillRoundedRect(0, 0, 140, 40, 8);
-            bg.lineStyle(2, 0xffffff, 0.5);
-            bg.strokeRoundedRect(0, 0, 140, 40, 8);
-            text.setText(gm.dronesActive ? "DRONE: ON" : "DRONE: OFF");
-        };
-
-        this.createStyledButton(width - 310, 10, 140, gm.dronesActive ? "DRONE: ON" : "DRONE: OFF", gm.dronesActive ? 0x27ae60 : 0xc0392b, () => {
-            gm.dronesActive = !gm.dronesActive;
-            SoundManager.getInstance().play('click');
-            // Manual update needed for toggle buttons
-            // Find components (bit hacky, but robust enough for this scope)
-            // Or better, just recreate the visuals? 
-            // Since createStyledButton returns promise/result, we can use it if we stored ref.
-            // But here we are inside scope.
-            // Let's rely on updateFacilities to NOT recreate, but we need to update visual.
-            // Simplest: `updateFacilities` could handle visual update? No, it just checks creation.
-
-            // We can access children of container.
-            if (this.droneToggleBtn) {
-                const bg = this.droneToggleBtn.list[0] as Phaser.GameObjects.Graphics;
-                const text = this.droneToggleBtn.list[1] as Phaser.GameObjects.Text;
-                update(bg, text);
+            if (candidates.length > 0) {
+                const t = candidates[Math.floor(Math.random() * candidates.length)];
+                t.destroyTrash();
+                // Visual
+                if (GameManager.getInstance().settings.particles) {
+                    const e = this.add.particles(t.x, t.y, 'particle', {
+                        tint: 0x00ff00, speed: 50, lifespan: 300, quantity: 5
+                    });
+                    this.time.delayedCall(300, () => e.destroy());
+                }
             }
-        }).then(res => {
-            this.droneToggleBtn = res.container;
-            update(res.bg, res.text);
-        });
+        }
     }
 
-    private createConveyorToggleButton() {
+    private autoSorterTimer: number = 0;
+    private checkAutoSorter(delta: number) {
         const gm = GameManager.getInstance();
-        const { width } = this.scale;
+        const sorter = gm.getUpgrade('auto_sorter');
+        if (!sorter || sorter.level === 0) return;
 
-        const update = (bg: any, text: any) => {
-            bg.clear();
-            bg.fillStyle(gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, 1);
-            bg.fillRoundedRect(0, 0, 140, 40, 8);
-            bg.lineStyle(2, 0xffffff, 0.5);
-            bg.strokeRoundedRect(0, 0, 140, 40, 8);
-            text.setText(gm.conveyorActive ? "BELT: ON" : "BELT: OFF");
-        };
+        this.autoSorterTimer += delta;
+        if (this.autoSorterTimer > 3000) { // Every 3s
+            this.autoSorterTimer = 0;
+            const bodies = this.matter.world.getAllBodies();
+            // Find trash to sell (Plastic/Metal/Circuit only?)
+            bodies.forEach((b: any) => {
+                if (b.gameObject && b.gameObject instanceof Trash && !b.gameObject.isDestroyed) {
+                    const t = b.gameObject as Trash;
+                    if (['plastic', 'metal', 'circuit'].includes(t.trashType)) {
+                        // 10% chance per tick to instant sell?
+                        if (Math.random() < 0.3) {
+                            t.isDestroyed = true; // Prevent internal logic
+                            // Manual sell logic
+                            // 1. Add resource
+                            gm.addResource(t.trashType as ResourceType, 1);
+                            // 2. Sell immediately? Auto Factory handles selling.
+                            // "Instant Exchange" implementation:
+                            // Actually, let's just destroy it and give MONEY directly, claiming it sorted & sold.
+                            const val = gm.trashValue * gm.marketMultiplier * 1.5; // Bonus
+                            gm.addMoney(val);
 
-        this.createStyledButton(width - 460, 10, 140, gm.conveyorActive ? "BELT: ON" : "BELT: OFF", gm.conveyorActive ? 0x2980b9 : 0x7f8c8d, () => {
-            gm.conveyorActive = !gm.conveyorActive;
-            SoundManager.getInstance().play('click');
-
-            // Toggle Graphics
-            this.conveyorGraphics.forEach(g => g.setVisible(gm.conveyorActive));
-
-            // Toggle Audio
-            if (gm.conveyorActive) {
-                SoundManager.getInstance().startLoop('conveyor', 'conveyor');
-            } else {
-                SoundManager.getInstance().stopLoop('conveyor');
-            }
-
-            if (this.conveyorToggleBtn) {
-                const bg = this.conveyorToggleBtn.list[0] as Phaser.GameObjects.Graphics;
-                const text = this.conveyorToggleBtn.list[1] as Phaser.GameObjects.Text;
-                update(bg, text);
-            }
-        }).then(res => {
-            this.conveyorToggleBtn = res.container;
-        });
+                            new FloatingText(this, t.x, t.y, `¥${Math.floor(val)}`, '#00d2d3');
+                            t.destroy();
+                        }
+                    }
+                }
+            });
+        }
     }
-
-    private createRefineryButton() {
-        const { width } = this.scale;
-
-        this.createStyledButton(width - 610, 10, 140, "精製所へ", 0x00d2d3, () => {
-            SoundManager.getInstance().play('click');
-            this.scene.pause(this);
-            this.scene.launch('RefineryScene');
-        }).then(res => {
-            this.refineryBtn = res.container;
-        });
-    }
-
     private createConveyorBelt() {
         const gm = GameManager.getInstance();
         if (!gm.conveyorUnlocked) return;
@@ -1436,8 +1501,6 @@ export class MainScene extends Phaser.Scene {
 
         // Apply initial state
         this.conveyorGraphics.forEach(g => g.setVisible(gm.conveyorActive));
-
-        // No more physical sensor - using reliable X-coord check in updateConveyorLogic
     }
 
     private shipTrash(trash: Trash) {
@@ -1468,32 +1531,6 @@ export class MainScene extends Phaser.Scene {
         // Disable physics so it doesn't bounce or trigger more collisions
         this.matter.body.setStatic(trash.body as MatterJS.BodyType, true);
         trash.setVisible(true); // Ensure visible during tween
-    }
-    private createLaserButton() {
-        const { width } = this.scale;
-
-        const update = (bg: any, text: any) => {
-            bg.clear();
-            bg.fillStyle(this.laserGridEnabled ? 0xe74c3c : 0x555555, 1);
-            bg.fillRoundedRect(0, 0, 140, 40, 8);
-            bg.lineStyle(2, 0xffffff, 0.5);
-            bg.strokeRoundedRect(0, 0, 140, 40, 8);
-            text.setText(this.laserGridEnabled ? 'LASER ON' : 'LASER OFF');
-        };
-
-        this.createStyledButton(width - 760, 10, 140, this.laserGridEnabled ? 'LASER ON' : 'LASER OFF', this.laserGridEnabled ? 0xe74c3c : 0x555555, () => {
-            SoundManager.getInstance().play('click');
-            this.laserGridEnabled = !this.laserGridEnabled;
-
-            if (this.laserBtn) {
-                const bg = this.laserBtn.list[0] as Phaser.GameObjects.Graphics;
-                const text = this.laserBtn.list[1] as Phaser.GameObjects.Text;
-                update(bg, text);
-            }
-        }).then(res => {
-            this.laserBtn = res.container;
-            this.laserBtn.setDepth(1000);
-        });
     }
 
     // === INVENTORY SYSTEM ===

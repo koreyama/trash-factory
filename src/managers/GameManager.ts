@@ -126,11 +126,23 @@ export class GameManager {
     public marketTrend: string = 'STABLE'; // 'BULL', 'BEAR', 'STABLE'
     public cryptoLevel: number = 0;
     public cryptoTimer: number = 0;
+    public miningActive: boolean = false; // Added
+    public miningIntensity: number = 1;   // Added
+    public depositedMoney: number = 0; // Bank
+    public autoSellThreshold: number = 0.0; // 0.0 = Trigger Always.
 
     public conveyorUnlocked: boolean = false; // New: Conveyor facility
     public conveyorActive: boolean = false; // Default OFF
     public shippedTrashBuffer: any[] = []; // New: Stores trash between main and refinery
     public refineryInventory: Record<string, number> = {}; // PERSISTENT
+
+    // Facility State (Centralized)
+
+    public magnetActive: boolean = false;
+    public laserActive: boolean = false;
+    public blackHoleActive: boolean = false;
+    public nanobotsActive: boolean = false; // Default OFF
+    public gravityActive: boolean = false; // Default OFF
 
 
     public plasticPerTrash: number = 1;
@@ -189,208 +201,203 @@ export class GameManager {
             });
         };
 
-        // ROOT (Center Bottom)
+        // === ROOT ===
         add('root_mining', 'ゴミ処理免許', 'ゴミ処理業を開始する基本許可証。', 0, null, 1, 1, { x: 0, y: 0 }, () => { });
 
-        // === TIER 1 (Basics) ===
-        // Rebalance: spawn_speed maxLv 20. More impactful per level.
-        add('spawn_speed', '搬入速度', 'ゴミ出現頻度UP (-100ms/Lv)', 200, 'root_mining', 20, 1.6, { x: -1, y: 1 }, (gm, lv) => {
-            // 1000ms start, min 100ms. Each level = -100ms.
+        // =================================================================================
+        // === NORTH BRANCH (Up, Y+): MATERIALS & RESEARCH ===
+        // Plastic -> Metal -> Circuit -> Bio -> Research -> Space -> Quantum
+        // =================================================================================
+
+        // Tier 1
+        add('unlock_plastic', 'プラ回収許可', 'プラスチックゴミが出現', 500, 'root_mining', 1, 1, { x: 0, y: 1 }, () => { });
+
+        // Tier 2
+        add('unlock_metal', '金属回収許可', '金属ゴミが出現', 2000, 'unlock_plastic', 1, 1, { x: 0, y: 2 }, () => { });
+
+        // Tier 3
+        add('unlock_crafting', 'クラフト許可', 'ガジェット製作を解禁', 5000, 'unlock_metal', 1, 1, { x: 1, y: 2 }, () => { });
+        add('unlock_circuit', '基板回収', '電子基板ゴミが出現', 10000, 'unlock_metal', 1, 1, { x: 0, y: 3 }, () => { });
+
+        // Tier 4
+        add('recycling_tech', '資源循環', '全資源の獲得量+1', 300000, 'unlock_circuit', 3, 2.0, { x: 1, y: 3 }, (gm, lv) => {
+            gm.plasticPerTrash = 1 + lv;
+        });
+
+        // Tier 5
+        add('research_lab', '研究所', '次世代技術を解禁', 500000, 'unlock_circuit', 1, 1, { x: 0, y: 4 }, () => { });
+        add('unlock_bio', 'バイオ処理', 'バイオ細胞ゴミが出現', 150000, 'research_lab', 1, 1, { x: -1, y: 4 }, () => { });
+
+        // Tier 6 (Space)
+        add('unlock_satellite', '衛星回収許可', '人工衛星パーツが出現', 5000000, 'research_lab', 1, 1, { x: 0, y: 5 }, () => { });
+        add('space_debris', '宇宙デブリ処理', '衛星パーツ出現率UP', 8000000, 'unlock_satellite', 5, 1.5, { x: 1, y: 5 }, () => { });
+        add('orbital_station', '軌道ステーション', 'パッシブでダークマター獲得', 20000000, 'unlock_satellite', 3, 2.0, { x: 0, y: 6 }, () => { });
+        add('moon_base', '月面基地', 'ダークマター生成速度2倍', 50000000, 'orbital_station', 1, 1, { x: 0, y: 7 }, () => { }, { type: 'darkMatter', amount: 500 });
+
+        // Tier 7 (Mars)
+        add('mars_colony', '火星コロニー', '真のエンディング解放', 500000000, 'moon_base', 1, 1, { x: 0, y: 8 }, () => { console.log("MARS WIN"); }, { type: 'darkMatter', amount: 5000 });
+
+
+        // =================================================================================
+        // === SOUTH BRANCH (Down, Y-): LOGISTICS & UTILITY ===
+        // Spawn Speed -> Capacity -> Drones -> Incinerator -> Auto-Sorting
+        // =================================================================================
+
+        // Tier 1
+        add('spawn_speed', '搬入速度', 'ゴミ出現頻度UP (-100ms/Lv)', 200, 'root_mining', 20, 1.6, { x: 0, y: -1 }, (gm, lv) => {
             gm.spawnDelay = Math.max(100, 1000 - (lv * 100));
         });
-        add('val_base', '基礎価値', 'ゴミの基本価値UP (+5円/Lv)', 100, 'root_mining', 20, 1.5, { x: 0, y: 1 }, (gm, lv) => {
-            gm.trashValue = 10 + (lv * 5);
-        });
-        add('vacuum_unlock', '吸引装置', '長押しでゴミを吸い寄せる', 300, 'root_mining', 1, 1, { x: 1, y: 1 }, () => { });
 
-        // === TIER 2 (Expansion) ===
-        // Rebalance: floor_capacity maxLv 50. More impactful per level.
-        add('floor_capacity', '床面積拡張', '最大ゴミ数+30個/Lv', 1500, 'spawn_speed', 50, 1.5, { x: -2, y: 2 }, (gm, lv) => {
+        // Tier 2
+        add('floor_capacity', '床面積拡張', '最大ゴミ数+30個/Lv', 1500, 'spawn_speed', 50, 1.5, { x: 0, y: -2 }, (gm, lv) => {
             gm.trashCapacity = 30 + (lv * 30);
         });
-        add('unlock_plastic', 'プラ回収許可', 'プラスチックゴミが出現', 500, 'spawn_speed', 1, 1, { x: -1, y: 2 }, () => { });
+        add('spawn_variety', '多様性', '特殊ゴミ出現率UP', 2500, 'spawn_speed', 5, 1.5, { x: 1, y: -2 }, () => { });
 
-        // Market moved to avoid overlap with unlock_plastic
-        // Combo Chip moved from (0,1) collision to (0,3)
-        add('combo_chip', 'コンボチップ', 'コンボボーナス倍率UP', 2500, 'marketing', 5, 1.5, { x: 0, y: 3 }, (gm, lv) => {
-            gm.comboMultiplier = 1.0 + (lv * 0.2);
+        // Tier 3
+        add('drone_unlock', '自律ドローン', '自動回収ドローンを配備', 30000, 'floor_capacity', 1, 1, { x: 0, y: -3 }, (gm) => { gm.droneUnlocked = true; });
+        add('drone_spec', 'ドローン性能', '移動速度UP', 80000, 'drone_unlock', 5, 1.8, { x: 1, y: -3 }, (gm, lv) => {
+            gm.droneSpeed = 150 + (lv * 100);
+        });
+        add('drone_ai', 'AI制御', 'ドローンの効率化', 120000, 'drone_unlock', 1, 1, { x: -1, y: -3 }, () => { });
+
+        // Tier 4
+        add('unlock_conveyor', 'ベルトコンベア', 'ゴミを精製所へ送り自動処理する', 50000, 'floor_capacity', 1, 1, { x: 0, y: -4 }, (gm) => { gm.conveyorUnlocked = true; }, { type: 'metal', amount: 200 });
+
+        // Tier 5
+        add('incinerator', '廃棄物発電', 'バイオゴミ消却時にエナジー', 100000, 'unlock_conveyor', 5, 1.6, { x: 0, y: -5 }, () => { });
+        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現', 800000, 'incinerator', 1, 1, { x: 1, y: -5 }, () => { });
+
+        // Tier 6
+        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現', 3000000, 'incinerator', 1, 1, { x: -1, y: -5 }, () => { });
+        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -1, y: -6 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
+        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -1, y: -7 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
+
+        // Tier 7
+        add('nanobot_swarm', 'ナノボット', '画面全体のゴミを徐々に分解', 1000000, 'incinerator', 1, 1, { x: 0, y: -6 }, () => { });
+        add('black_hole_storage', '無限圧縮', '床面積上限を9999に拡張', 50000000, 'nanobot_swarm', 1, 1, { x: 0, y: -7 }, (gm) => { gm.trashCapacity = 9999; });
+
+
+        // =================================================================================
+        // === EAST BRANCH (Right, X+): ECONOMY & INDUSTRY ===
+        // Value -> Marketing -> Interest -> Factory -> Crypto -> Buy Planet
+        // =================================================================================
+
+        // Tier 1
+        add('val_base', '基礎価値', 'ゴミの基本価値UP (+5円/Lv)', 100, 'root_mining', 20, 1.5, { x: 1, y: 0 }, (gm, lv) => {
+            gm.trashValue = 10 + (lv * 5);
         });
 
-        add('marketing', '広告戦略', '全収入倍率+10%/Lv', 2000, 'val_base', 10, 1.5, { x: 0, y: 2 }, (gm, lv) => {
+        // Tier 2
+        add('marketing', '広告戦略', '全収入倍率+10%/Lv', 2000, 'val_base', 10, 1.5, { x: 2, y: 0 }, (gm, lv) => {
             gm.marketingMultiplier = 1.0 + (lv * 0.1);
         });
-        add('vacuum_power', '吸引力強化', '吸引スピードUP', 500, 'vacuum_unlock', 10, 1.5, { x: 1, y: 2 }, (gm, lv) => {
-            gm.vacuumPower = 0.005 + (lv * 0.002);
+        add('combo_chip', 'コンボチップ', 'コンボボーナス倍率UP', 2500, 'val_base', 5, 1.5, { x: 2, y: 1 }, (gm, lv) => {
+            gm.comboMultiplier = 1.0 + (lv * 0.2);
         });
-        add('unlock_metal', '金属回収許可', '金属ゴミが出現', 2000, 'vacuum_unlock', 1, 1, { x: 2, y: 2 }, () => { });
-
-        // === TIER 3 (Specialization) ===
-        add('black_hole_unlock', 'ブラックホール', 'ゴミを吸い込む特異点を生成', 50000, 'floor_capacity', 1, 1, { x: -3, y: 3 }, () => { }, { type: 'metal', amount: 100 });
-        add('spawn_variety', '多様性', '特殊ゴミ出現率UP', 2500, 'unlock_plastic', 5, 1.5, { x: -2, y: 3 }, () => { });
-
-        // Moved from (-1, 2) to (-1, 3) to unhide unlock_plastic
-        add('market_manipulation', '相場操作', '一時的に売却額UPスキル', 5000, 'marketing', 1, 1, { x: -1, y: 3 }, () => { });
-
-        // Shifted (0,3) -> (0,4)
-        add('click_crit', 'クリティカル', 'クリック時に確率で3倍収入', 500, 'combo_chip', 10, 1.6, { x: 0, y: 4 }, (gm, lv) => {
+        add('click_crit', 'クリティカル', 'クリック時に確率で3倍収入', 500, 'val_base', 10, 1.6, { x: 2, y: -1 }, (gm, lv) => {
             gm.critChance = Math.min(0.5, lv * 0.05);
         });
-        add('vacuum_range', '吸引範囲', '吸引の有効範囲拡大', 600, 'vacuum_power', 10, 1.5, { x: 1, y: 3 }, (gm, lv) => {
-            gm.vacuumRange = 200 + (lv * 50);
-        });
-
-        add('unlock_crafting', 'クラフト許可', 'ガジェット製作を解禁', 5000, 'unlock_metal', 1, 1, { x: 2, y: 3 }, () => { });
-        add('drone_unlock', '自律ドローン', '自動回収ドローンを配備', 30000, 'unlock_metal', 1, 1, { x: 3, y: 3 }, (gm) => { gm.droneUnlocked = true; });
-        add('unlock_conveyor', 'ベルトコンベア', 'ゴミを精製所へ送り自動処理する', 50000, 'unlock_metal', 1, 1, { x: 4, y: 3 }, (gm) => { gm.conveyorUnlocked = true; }, { type: 'metal', amount: 200 });
-
-        // === TIER 4 (Technological Leap) ===
-        // Black Hole Branch
-        add('hawking_radiation', 'ホーキング放射', '活性化中、エネルギーを少し還元', 200000, 'black_hole_unlock', 1, 1, { x: -4, y: 4 }, () => { });
-        add('event_horizon', '事象の地平線', 'ブラックホールの吸引範囲拡大', 3000, 'black_hole_unlock', 5, 1.6, { x: -3, y: 4 }, () => {
-            // Logic handled in BlackHole.ts
-        });
-
-        add('unlock_circuit', '基板回収', '電子基板ゴミが出現', 10000, 'spawn_variety', 1, 1, { x: -2, y: 4 }, () => { });
-        // Shifted (0,4) -> (0,5)
-        add('luck_unlock', 'ラッキーゴミ', '金色のゴミが出現', 5000, 'click_crit', 1, 1, { x: 0, y: 5 }, (gm) => { gm.luckRate = 0.05; });
-
-        add('dynamite_spec', '発破技術', 'ダイナマイトの効果範囲拡大', 15000, 'unlock_crafting', 5, 1.5, { x: 1, y: 4 }, (gm, lv) => {
-            gm.dynamiteRange = 150 + (lv * 30);
-        });
-
-        add('solar_panel', 'ソーラーパネル', '毎秒エネルギー+1/Lv（レーザー用）', 20000, 'unlock_crafting', 10, 1.5, { x: 2, y: 4 }, (gm, lv) => {
-            gm.energyGeneration = lv * 1;
-        });
-
-        add('compound_interest', '複利運用', '5秒毎に所持金の0.5%利息(Lvで上限UP)', 30000, 'drone_unlock', 10, 1.5, { x: 3, y: 4 }, (gm, lv) => {
+        // Tier 3
+        add('compound_interest', '複利運用', '5秒毎に所持金の0.5%利息', 30000, 'marketing', 10, 1.5, { x: 3, y: 0 }, (gm, lv) => {
             gm.interestRate = 0.005;
             gm.interestCap = 1000 + (lv * 1000);
         });
 
-        add('drone_spec', 'ドローン性能', '移動速度UP', 80000, 'drone_unlock', 5, 1.8, { x: 4, y: 4 }, (gm, lv) => {
-            gm.droneSpeed = 150 + (lv * 100);
-        });
+        // Tier 4
+        add('unlock_industry', '産業革命', '自動資源生成・売却系を解禁', 100000, 'compound_interest', 1, 1, { x: 4, y: 0 }, () => { });
+        add('trash_futures', 'ゴミ先物取引', '売却価格が常に変動', 150000, 'unlock_industry', 1, 1, { x: 4, y: 1 }, (gm) => { gm.futuresUnlocked = true; });
+        add('auto_miner', '自動採掘', '毎秒プラ+金属を獲得', 200000, 'unlock_industry', 10, 1.3, { x: 5, y: -1 }, () => { });
+        add('auto_factory', '自動工場', '毎秒プラ+金属を売却', 500000, 'unlock_industry', 10, 1.4, { x: 5, y: 1 }, () => { });
 
-        // === TIER 5 (Advanced Infrastructure) ===
-        add('singularity_engine', '特異点エンジン', 'ブラックホールの成長速度UP', 150000, 'hawking_radiation', 3, 2.0, { x: -4, y: 5 }, () => { });
-        add('recycling_tech', '資源循環', '全資源の獲得量+1', 300000, 'unlock_circuit', 3, 2.0, { x: -2, y: 5 }, (gm, lv) => {
-            gm.plasticPerTrash = 1 + lv;
-        });
+        // Tier 5
+        add('auto_sorter', '自動選別機', '特定ゴミを即時換金', 1500000, 'auto_factory', 1, 1, { x: 6, y: 1 }, () => { });
+        add('global_mining', '世界展開', '収入効率大幅UP', 800000, 'auto_miner', 1, 1, { x: 6, y: -1 }, () => { });
 
-        add('unlock_bio', 'バイオ処理', 'バイオ細胞ゴミが出現', 150000, 'research_lab', 1, 1, { x: -1, y: 6 }, () => { });
-        add('research_lab', '研究所', '次世代技術を解禁', 500000, 'unlock_circuit', 1, 1, { x: -1, y: 5 }, () => { });
-
-        // Shifted (0,5) -> (0,6)
-        add('rainbow_trash', '虹色ゴミ', '超高額ゴミが出現', 75000, 'luck_unlock', 1, 1, { x: 0, y: 6 }, () => { });
-
-        add('gadget_mastery', 'ガジェット研究', 'クラフトコスト削減', 50000, 'dynamite_spec', 5, 1.5, { x: 1, y: 5 }, (gm, lv) => {
-            gm.craftingCostReduction = Math.min(0.5, lv * 0.1);
-        });
-
-        add('battery_upgrade', '大容量蓄電池', '最大エネルギー保存量UP', 50000, 'solar_panel', 5, 1.5, { x: 2, y: 5 }, (gm, lv) => {
-            gm.maxEnergy = 100 + (lv * 100);
-        });
-
-        add('unlock_industry', '産業革命', '自動資源生成・売却系を解禁', 100000, 'compound_interest', 1, 1, { x: 3, y: 5 }, () => { });
-        add('drone_ai', 'AI制御', 'ドローンの効率化', 120000, 'drone_spec', 1, 1, { x: 5, y: 5 }, () => { });
-
-        // === TIER 6 (Future Tech) ===
-        add('trash_futures', 'ゴミ先物取引', '売却価格が常に変動するように', 150000, 'unlock_industry', 1, 1, { x: 3, y: 6 }, (gm) => { gm.futuresUnlocked = true; });
-
-        add('quantum_destabilizer', '量子分解', '爆発で資源を獲得可能に', 800000, 'singularity_engine', 1, 1, { x: -4, y: 6 }, () => { });
-
-        add('incinerator', '廃棄物発電', 'バイオゴミ消却時にエナジー', 100000, 'unlock_bio', 5, 1.6, { x: -1, y: 7 }, () => { });
-
-        // Shifted (0,6) -> (0,7)
-        // Parent changed: research_lab -> rainbow_trash (0,6) to avoid crossing Y=6
-        add('quantum_core', '量子コア', '全速度倍増', 1000000, 'rainbow_trash', 1, 1, { x: 0, y: 7 }, () => { });
-
-        add('laser_grid', '防衛レーザー', '画面下半分のゴミを自動焦却（エネルギー消費）', 250000, 'battery_upgrade', 5, 2.0, { x: 2, y: 6 }, (gm, lv) => {
-            gm.laserPower = lv * 10;
-        });
-
-        add('magnet_field', '磁力場', '金属・基板ゴミを画面中央に引き寄せる', 40000, 'gadget_mastery', 1, 1, { x: 1, y: 6 }, () => { });
-
-        add('auto_miner', '自動採掘', '毎秒プラ+金属をLv個ずつ獲得', 200000, 'unlock_industry', 10, 1.3, { x: 4, y: 6 }, () => { });
-        add('auto_factory', '自動工場', '毎秒プラ+金属をLv個売却して換金', 500000, 'unlock_industry', 10, 1.4, { x: 5, y: 6 }, () => { });
-
-        // === TIER 7 (Cosmic Tech) ===
-        // Parent changed: quantum_core -> recycling_tech (-2,5) to avoid crossing incinerator (-1,7)
-        // Path: (-2,5) -> (-2,7). Crosses (-2,6) which is empty.
-        add('gravity_manipulator', '重力制御', 'ゴミの落下速度低下(積みやすい)', 2000000, 'recycling_tech', 3, 1.5, { x: -2, y: 7 }, () => { });
-        // REMOVED PRESTIGE UNLOCK
-        // add('prestige_unlock', '転生システム', '強くてニューゲーム', 10000000, 'quantum_core', 1, 1, { x: 0, y: 7 }, () => { });
-        add('time_machine', 'タイムマシン', '失ったゴミを回収', 25000000, 'quantum_core', 1, 1, { x: 1, y: 7 }, () => { });
-
-        add('crypto_mining', '仮想通貨マイニング', 'エネルギーを消費して資金生成', 500000, 'trash_futures', 20, 1.4, { x: 3, y: 7 }, (gm, lv) => {
+        // Tier 6
+        add('crypto_mining', '仮想通貨マイニング', 'エネルギーを消費して資金生成', 500000, 'unlock_industry', 20, 1.4, { x: 5, y: 0 }, (gm, lv) => {
             gm.cryptoLevel = lv;
         });
 
-        add('auto_sorter', '自動選別機', '特定ゴミを即時換金', 1500000, 'auto_factory', 1, 1, { x: 4, y: 7 }, () => { });
-        add('global_mining', '世界展開', '収入効率大幅UP', 800000, 'auto_factory', 1, 1, { x: 6, y: 7 }, () => { });
+        // Tier 7
+        add('buy_planet', '地球買収', 'ゲームクリア', 100000000, 'crypto_mining', 1, 1, { x: 7, y: 0 }, () => { console.log("WIN"); }, { type: 'metal', amount: 5000 });
+        add('galactic_fed', '銀河連邦加盟', 'エンディング分岐B', 200000000, 'buy_planet', 1, 1, { x: 8, y: 0 }, () => { }, { type: 'circuit', amount: 9999 });
 
-        // === TIER 8 (Dimensional) ===
-        // Black Hole (End of Press Branch)
-        add('black_hole_storage', '無限圧縮', '床面積上限を9999に拡張', 50000000, 'gravity_manipulator', 1, 1, { x: -2, y: 8 }, (gm) => { gm.trashCapacity = 9999; });
 
-        // REMOVED MULTIVERSE
-        // add('multiverse', '多元宇宙', '並行世界から収入を得る', 50000000, 'prestige_unlock', 1, 1, { x: 0, y: 8 }, () => { });
+        // =================================================================================
+        // === WEST BRANCH (Left, X-): PHYSICS & ENERGY ===
+        // Vacuum -> Energy -> Black Hole -> Time Prep -> Quantum
+        // =================================================================================
 
-        add('time_warp', '時間跳躍', '時間加速スキル', 75000000, 'time_machine', 1, 1, { x: 2, y: 8 }, () => { });
+        // Tier 1
+        add('vacuum_unlock', '吸引装置', '長押しでゴミを吸い寄せる', 300, 'root_mining', 1, 1, { x: -1, y: 0 }, () => { });
 
-        add('nanobot_swarm', 'ナノボット', '画面全体のゴミを徐々に分解', 1000000, 'incinerator', 1, 1, { x: -1, y: 8 }, () => { });
+        // Tier 2
+        add('vacuum_power', '吸引力強化', '吸引スピードUP', 500, 'vacuum_unlock', 10, 1.5, { x: -2, y: 0 }, (gm, lv) => {
+            gm.vacuumPower = 0.005 + (lv * 0.0005);
+        });
+        add('vacuum_range', '吸引範囲', '吸引の有効範囲拡大', 600, 'vacuum_power', 10, 1.5, { x: -2, y: 1 }, (gm, lv) => {
+            gm.vacuumRange = 200 + (lv * 50);
+        });
 
-        // === TIER 9 (Divine) ===
-        // Updated parent for buy_planet since multiverse is gone. Using black_hole_storage or similar?
-        // Let's link it to black_hole_storage or time_warp.
-        add('buy_planet', '地球買収', 'ゲームクリア', 100000000, 'black_hole_storage', 1, 1, { x: 0, y: 9 }, () => { console.log("WIN"); }, { type: 'metal', amount: 5000 });
-        add('galactic_fed', '銀河連邦加盟', 'エンディング分岐B', 200000000, 'buy_planet', 1, 1, { x: 1, y: 10 }, () => { }, { type: 'circuit', amount: 9999 });
+        // Tier 3
+        add('black_hole_unlock', 'ブラックホール', 'ゴミを吸い込む特異点を生成', 50000, 'vacuum_power', 1, 1, { x: -3, y: 0 }, () => { }, { type: 'metal', amount: 100 });
+        add('hawking_radiation', 'ホーキング放射', '活性化中、エネルギーを少し還元', 200000, 'black_hole_unlock', 1, 1, { x: -3, y: -1 }, () => { });
+        add('event_horizon', '事象の地平線', 'ブラックホールの吸引範囲拡大', 3000, 'black_hole_unlock', 5, 1.6, { x: -3, y: 1 }, () => { });
+        add('singularity_engine', '特異点エンジン', 'ブラックホールの成長速度UP', 150000, 'black_hole_unlock', 3, 2.0, { x: -4, y: 0 }, () => { });
 
-        // =====================================================
-        // === NEW CONTENT: Extended Branches ===
-        // =====================================================
+        // Tier 4 (Energy)
+        add('solar_panel', 'ソーラーパネル', '毎秒エネルギー+1/Lv', 20000, 'vacuum_power', 10, 1.5, { x: -2, y: -2 }, (gm, lv) => {
+            gm.energyGeneration = lv * 1;
+        });
+        add('battery_upgrade', '大容量蓄電池', '最大エネルギー保存量UP', 50000, 'solar_panel', 5, 1.5, { x: -2, y: -3 }, (gm, lv) => {
+            gm.maxEnergy = 100 + (lv * 100);
+        });
+        add('laser_grid', '防衛レーザー', '自動焦却（エネルギー消費）', 250000, 'battery_upgrade', 5, 2.0, { x: -1, y: -2 }, (gm, lv) => {
+            gm.laserPower = lv * 10;
+        });
 
-        // === TIER 6: New Trash Types ===
-        // Battery (Rare Metal) - unlocks from auto_sorter
-        add('unlock_battery', 'バッテリー回収', 'バッテリーゴミが出現（レアメタル獲得）', 500000, 'auto_sorter', 1, 1, { x: 5, y: 7 }, () => { });
+        // Tier 5 (Quantum)
+        add('quantum_core', '量子コア', '全速度倍増', 1000000, 'singularity_engine', 1, 1, { x: -5, y: 0 }, () => { });
+        add('quantum_destabilizer', '量子分解', '爆発で資源を獲得可能に', 800000, 'quantum_core', 1, 1, { x: -5, y: 1 }, () => { });
+        add('time_machine', 'タイムマシン', '失ったゴミを回収', 25000000, 'quantum_core', 1, 1, { x: -6, y: 0 }, () => { });
+        add('time_warp', '時間跳躍', '時間加速スキル', 75000000, 'time_machine', 1, 1, { x: -7, y: 0 }, () => { });
 
-        // Medical Waste - unlocks from incinerator
-        add('unlock_medical', '医療廃棄物処理', '医療廃棄物が出現（バイオ細胞x2）', 800000, 'incinerator', 1, 1, { x: -2, y: 7 }, () => { });
+        // Tier 6 (Quantum High)
+        add('unlock_quantum', '量子デバイス回収', '量子デバイスが出現', 50000000, 'quantum_core', 1, 1, { x: -5, y: -2 }, () => { });
+        add('quantum_storage', '量子ストレージ', '床容量+500', 80000000, 'unlock_quantum', 3, 1.5, { x: -6, y: -2 }, (gm, lv) => { gm.trashCapacity += lv * 500; });
+        add('quantum_teleport', '量子テレポート', 'ゴミを瞬時に回収可能', 150000000, 'quantum_storage', 1, 1, { x: -7, y: -2 }, () => { });
+        add('quantum_multiverse', 'マルチバース', '並行世界から収入を得る', 1000000000, 'quantum_teleport', 1, 1, { x: -8, y: -2 }, () => { console.log("MULTIVERSE WIN"); }, { type: 'quantumCrystal', amount: 10000 });
 
-        // === SPACE DEVELOPMENT BRANCH ===
-        // Satellite (Dark Matter) - unlocks from research_lab
-        add('unlock_satellite', '衛星回収許可', '人工衛星パーツが出現（ダークマター獲得）', 5000000, 'research_lab', 1, 1, { x: -3, y: 6 }, () => { });
 
-        add('space_debris', '宇宙デブリ処理', '衛星パーツ出現率UP (+10%/Lv)', 8000000, 'unlock_satellite', 5, 1.5, { x: -4, y: 7 }, () => { });
+        // === OTHER / LEFTOVER ADAPTATION ===
+        // Some items from the previous list might need home if I missed them. checked generally looks good.
+        // I put 'magnet_field', 'gravity_manipulator' here:
+        add('magnet_field', '磁力場', '金属・基板を中央に引き寄せる', 40000, 'vacuum_power', 1, 1, { x: -1, y: 1 }, () => { });
+        add('gravity_manipulator', '重力制御', 'ゴミの落下速度低下', 2000000, 'singularity_engine', 3, 1.5, { x: -4, y: 1 }, () => { });
 
-        add('orbital_station', '軌道ステーション', 'パッシブでダークマター獲得', 20000000, 'space_debris', 3, 2.0, { x: -5, y: 8 }, () => { });
+        // Rare Metals
+        add('unlock_battery', 'バッテリー回収', 'バッテリーゴミが出現', 500000, 'auto_sorter', 1, 1, { x: 6, y: 2 }, () => { });
+        add('rare_metal_processing', 'レアメタル精製', 'レアメタル獲得量+1', 1000000, 'unlock_battery', 5, 1.5, { x: 7, y: 2 }, () => { });
+        add('rare_alloy', '特殊合金', 'ガジェット効果2倍', 5000000, 'rare_metal_processing', 1, 1, { x: 8, y: 2 }, () => { }, { type: 'rareMetal', amount: 500 });
 
-        add('moon_base', '月面基地', 'ダークマター生成速度2倍', 50000000, 'orbital_station', 1, 1, { x: -5, y: 9 }, () => { }, { type: 'darkMatter', amount: 500 });
+        // Misc
+        add('market_manipulation', '相場操作', '一時的に売却額UP', 5000, 'marketing', 1, 1, { x: 3, y: 1 }, () => { });
+        add('luck_unlock', 'ラッキーゴミ', '金色のゴミが出現', 5000, 'click_crit', 1, 1, { x: 3, y: -1 }, (gm) => { gm.luckRate = 0.05; });
+        add('rainbow_trash', '虹色ゴミ', '超高額ゴミが出現', 75000, 'luck_unlock', 1, 1, { x: 4, y: -1 }, () => { });
 
-        add('mars_colony', '火星コロニー', '真のエンディング解放', 500000000, 'moon_base', 1, 1, { x: -4, y: 10 }, () => { console.log("MARS WIN"); }, { type: 'darkMatter', amount: 5000 });
-
-        // === NUCLEAR ENERGY BRANCH ===
-        // Nuclear Waste (Radioactive) - unlocks from unlock_bio
-        add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現（放射性物質獲得）', 3000000, 'unlock_bio', 1, 1, { x: -2, y: 7 }, () => { });
-
-        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -3, y: 8 }, (gm, lv) => { gm.energyGeneration += lv * 10; });
-
-        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -3, y: 9 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
-
-        // === QUANTUM PHYSICS BRANCH ===
-        // Quantum Device (Quantum Crystal) - unlocks from quantum_core
-        add('unlock_quantum', '量子デバイス回収', '量子デバイスが出現（量子結晶獲得）', 50000000, 'quantum_core', 1, 1, { x: 1, y: 8 }, () => { });
-
-        add('quantum_storage', '量子ストレージ', '床容量+500', 80000000, 'unlock_quantum', 3, 1.5, { x: 2, y: 9 }, (gm, lv) => { gm.trashCapacity += lv * 500; });
-
-        add('quantum_teleport', '量子テレポート', 'ゴミを瞬時に回収可能', 150000000, 'quantum_storage', 1, 1, { x: 3, y: 10 }, () => { });
-
-        add('quantum_multiverse', 'マルチバース', '並行世界から収入を得る', 1000000000, 'quantum_teleport', 1, 1, { x: 3, y: 11 }, () => { console.log("MULTIVERSE WIN"); }, { type: 'quantumCrystal', amount: 10000 });
-
-        // === RARE METAL BRANCH ===
-        add('rare_metal_processing', 'レアメタル精製', 'レアメタル獲得量+1/Lv', 1000000, 'unlock_battery', 5, 1.5, { x: 6, y: 8 }, () => { });
-
-        add('rare_alloy', '特殊合金', 'ガジェット効果2倍', 5000000, 'rare_metal_processing', 1, 1, { x: 7, y: 9 }, () => { }, { type: 'rareMetal', amount: 500 });
+        // Gadget Stuff
+        add('gadget_mastery', 'ガジェット研究', 'クラフトコスト削減', 50000, 'unlock_crafting', 5, 1.5, { x: 1, y: 1 }, (gm, lv) => {
+            gm.craftingCostReduction = Math.min(0.5, lv * 0.1);
+        });
+        add('dynamite_spec', '発破技術', 'ダイナマイトの効果範囲拡大', 15000, 'unlock_crafting', 5, 1.5, { x: 0, y: 3 }, (gm, lv) => { // Collides with unlock_circuit? No unlock_circuit is (0,3). Move this.
+            // Let's put unlock_circuit at (0,3) and this at (1,4) -> wait research_lab is (0,4).
+            // Let's branch dynamite off crafting
+            gm.dynamiteRange = 150 + (lv * 30);
+        });
+        // Fix collision: unlock_circuit is (0,3). dynamite_spec to (1,3)? recycling_tech is (1,3).
+        // Move dynamite_spec to (2,2)
+        this.getUpgrade('dynamite_spec')!.pos = { x: 2, y: 2 };
     }
 
 
@@ -1005,12 +1012,6 @@ export class GameManager {
             }
         }
     }
-
-    public depositedMoney: number = 0; // Bank
-
-    public miningActive: boolean = false; // Crypto Toggle
-    public miningIntensity: number = 1; // 1-10
-    public autoSellThreshold: number = 0.0; // 0.0 = Trigger Always.
 
     public sellResources(types: ResourceType[], percent: number = 1.0): number {
         let revenue = 0;

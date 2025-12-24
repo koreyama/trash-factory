@@ -41,23 +41,38 @@ export class Drone extends Phaser.GameObjects.Container {
         // Simple search
         // We need access to MainScene's trash list or physics bodies
         // Hacky way: query world
-        const bodies = this.scene.matter.world.getAllBodies();
-        let closest: Trash | null = null;
-        let minDesc = Infinity;
+        // Smart AI: Prioritize high value if upgraded
+        const ai = gm.getUpgrade('drone_ai');
+        const smartMode = (ai && ai.level > 0);
 
+        let bestTarget: Trash | null = null;
+        let maxScore = -Infinity;
+
+        const bodies = this.scene.matter.world.getAllBodies();
         bodies.forEach((b: any) => {
             if (b.gameObject && b.gameObject instanceof Trash && !b.gameObject.isDestroyed) {
                 const t = b.gameObject as Trash;
-                const d = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
-                if (d < minDesc) {
-                    minDesc = d;
-                    closest = t;
+                const dist = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
+
+                let score = -dist; // Default: closer is better (higher score)
+
+                if (smartMode) {
+                    // Value Heuristic
+                    const typeScore = this.getTypeScore(t.trashType);
+                    // Weight value heavily against distance
+                    // e.g. 1 tier higher ~= 500px distance worth
+                    score = (typeScore * 500) - dist;
+                }
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    bestTarget = t;
                 }
             }
         });
 
-        if (closest) {
-            this.target = closest;
+        if (bestTarget) {
+            this.target = bestTarget;
             this.isBusy = true;
             this.moveToTarget();
         } else {
@@ -142,5 +157,21 @@ export class Drone extends Phaser.GameObjects.Container {
                 this.target = null;
             }
         });
+    }
+
+    private getTypeScore(type: string): number {
+        switch (type) {
+            case 'quantum': return 10;
+            case 'satellite': return 9;
+            case 'nuclear': return 8;
+            case 'rareMetal': return 7;
+            case 'battery': return 6;
+            case 'medical': return 5;
+            case 'circuit': return 4;
+            case 'bio': return 3;
+            case 'metal': return 2;
+            case 'plastic': return 1;
+            default: return 0;
+        }
     }
 }

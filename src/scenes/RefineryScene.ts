@@ -491,7 +491,7 @@ export class RefineryScene extends Phaser.Scene {
         ];
         const colors = [
             '#3498db', '#95a5a6', '#2ecc71', '#9b59b6', // Basic
-            '#f1c40f', '#27ae60', '#6c5ce7', '#00cec9'  // Advanced
+            '#f1c40f', '#27ae60', '#a29bfe', '#00cec9'  // Advanced (Dark Matter brightened)
         ];
 
         // CLEANUP: Destroy old UIs to prevent ghosting

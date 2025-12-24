@@ -56,7 +56,8 @@ export class Trash extends Phaser.Physics.Matter.Image {
             this.setVelocity(Phaser.Math.Between(-2, 2), Phaser.Math.Between(0, 5));
         }
 
-        this.setFriction(0.5);
+        this.setFriction(0.005); // Very low surface friction
+        this.setFrictionAir(0.0005); // Extremely low air resistance for flinging
         if (type !== 'bio') this.setBounce(0.2);
 
         this.setInteractive();
