@@ -3,7 +3,6 @@ export class SoundManager {
     private ctx: AudioContext | null = null;
     private enabled: boolean = true;
     private volume: number = 1.0;
-    private bgmVolume: number = 0.5;
     private sfxVolume: number = 0.5;
 
     private constructor() {
@@ -27,9 +26,8 @@ export class SoundManager {
         this.volume = Math.max(0, Math.min(1, v));
     }
 
-    public setBgmVolume(v: number) {
-        this.bgmVolume = Math.max(0, Math.min(1, v));
-        // Update loops if they are BGM (actually BGM isn't loops here yet, but BGM volume would apply)
+    public setBgmVolume(_v: number) {
+        // Placeholder: BGM logic not yet implemented
     }
 
     public setSfxVolume(v: number) {
