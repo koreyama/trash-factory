@@ -161,6 +161,14 @@ export class GameManager {
     public refineryCapacity: number = 100; // NEW: Cap for shippedTrashBuffer (increased to 100)
     public refineryInventory: Record<string, number> = {}; // PERSISTENT
 
+    public getRefineryOccupancy(): number {
+        let count = this.shippedTrashBuffer.length;
+        for (const type in this.refineryInventory) {
+            count += this.refineryInventory[type] || 0;
+        }
+        return count;
+    }
+
     // Facility State (Centralized)
 
     public magnetActive: boolean = false;

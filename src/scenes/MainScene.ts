@@ -1524,18 +1524,19 @@ export class MainScene extends Phaser.Scene {
         if (trash.isDestroyed) return;
         const gm = GameManager.getInstance();
 
-        // Check Capacity
-        if (gm.shippedTrashBuffer.length >= gm.refineryCapacity) {
-            new FloatingText(this, trash.x, trash.y, "精製所満杯!", "#e74c3c");
-            return;
+        // Check Global Capacity (Buffer + Inventory)
+        const isFull = gm.getRefineryOccupancy() >= gm.refineryCapacity;
+
+        if (isFull) {
+            // "Discard" logic: play FX but don't add to buffer
+            new FloatingText(this, trash.x, trash.y, "容量不足: 廃棄!", "#e74c3c");
+        } else {
+            const type = trash.trashType === 'bio' ? 'bioCell' : trash.trashType;
+            gm.shippedTrashBuffer.push({ type, x: trash.x });
+            new FloatingText(this, trash.x, trash.y, "SHIPPED!", "#00d2d3");
         }
 
         trash.isDestroyed = true; // Mark immediately
-        const type = trash.trashType === 'bio' ? 'bioCell' : trash.trashType;
-        gm.shippedTrashBuffer.push({ type, x: trash.x });
-
-        // Instant visual feedback
-        new FloatingText(this, trash.x, trash.y, "SHIPPED!", "#00d2d3");
 
         // Animate suck into hatch
         this.tweens.add({
