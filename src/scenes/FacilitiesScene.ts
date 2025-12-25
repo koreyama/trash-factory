@@ -202,10 +202,10 @@ export class FacilitiesScene extends Phaser.Scene {
 
         // --- Vacuum Tuning ---
         if (has('vacuum_unlock')) {
-            addSlider('右クリック吸引力', gm.vacuumPowerPref, (v) => {
+            addSlider('吸引装置：出力', gm.vacuumPowerPref, (v) => {
                 gm.vacuumPowerPref = v;
             });
-            addSlider('右クリック吸引範囲', gm.vacuumRangePref, (v) => {
+            addSlider('吸引装置：範囲', gm.vacuumRangePref, (v) => {
                 gm.vacuumRangePref = v;
             });
         }
