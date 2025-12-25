@@ -272,18 +272,8 @@ export class FinanceScene extends Phaser.Scene {
 
             // Inventory Value
             let totalVal = 0;
-            // Simplified valuation for UI: base * multiplier * amount
-            const getPrice = (t: string) => {
-                const base = gm.trashValue;
-                if (t == 'plastic' || t == 'metal') return base * 2;
-                if (t == 'circuit') return base * 5;
-                if (t == 'bioCell') return base * 10;
-                if (t == 'rareMetal') return base * 20;
-                if (t == 'radioactive') return base * 50;
-                if (t == 'darkMatter') return base * 100;
-                if (t == 'quantumCrystal') return base * 500;
-                return base;
-            };
+            // Valuation for UI: use central price logic
+            const getPrice = (t: string) => gm.getResourcePrice(t);
 
             this.selectedResources.forEach(type => {
                 const current = (gm as any)[type] as number;

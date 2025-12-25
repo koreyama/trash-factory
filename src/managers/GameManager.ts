@@ -1095,11 +1095,8 @@ export class GameManager {
         }
     }
 
-    public sellResources(types: ResourceType[], percent: number = 1.0): number {
-        let revenue = 0;
-        const multiplier = this.marketMultiplier;
+    public getResourcePrice(type: string): number {
         const base = this.trashValue;
-
         const prices: Record<string, number> = {
             'plastic': base * 0.5,
             'metal': base * 0.5,
@@ -1110,13 +1107,19 @@ export class GameManager {
             'darkMatter': base * 20.0,
             'quantumCrystal': base * 50.0
         };
+        return prices[type] || base;
+    }
+
+    public sellResources(types: ResourceType[], percent: number = 1.0): number {
+        let revenue = 0;
+        const multiplier = this.marketMultiplier;
 
         types.forEach(type => {
             const current = (this as any)[type] as number;
             if (current > 0) {
                 const amount = Math.floor(current * percent);
                 if (amount > 0) {
-                    const price = prices[type] || base;
+                    const price = this.getResourcePrice(type);
                     const earnings = Math.floor(amount * price * multiplier);
                     revenue += earnings;
                     this.addResource(type, -amount);

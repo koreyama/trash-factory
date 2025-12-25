@@ -287,7 +287,7 @@ export class RefineryScene extends Phaser.Scene {
             default: resType = 'plastic'; mult = 0.2; break;
         }
 
-        gm.addResource(resType, (gm.plasticPerTrash || 1) * mult);
+        gm.addResource(resType, Math.floor((gm.plasticPerTrash || 1) * mult));
         const earnings = Math.floor(gm.trashValue * mult * gm.marketMultiplier);
         gm.addMoney(earnings); // Money also scales with market
 
