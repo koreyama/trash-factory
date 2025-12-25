@@ -1098,13 +1098,13 @@ export class GameManager {
     public getResourcePrice(type: string): number {
         const base = this.trashValue;
         const prices: Record<string, number> = {
-            'plastic': base * 0.5,
-            'metal': base * 0.5,
-            'circuit': base * 1.0,
-            'bioCell': base * 2.0,
-            'rareMetal': base * 5.0,
-            'radioactive': base * 10.0,
-            'darkMatter': base * 20.0,
+            'plastic': base * 0.1,
+            'metal': base * 0.1,
+            'circuit': base * 0.5,
+            'bioCell': base * 1.0,
+            'rareMetal': base * 2.0,
+            'radioactive': base * 5.0,
+            'darkMatter': base * 10.0,
             'quantumCrystal': base * 50.0
         };
         return prices[type] || base;
