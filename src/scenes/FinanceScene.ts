@@ -123,7 +123,7 @@ export class FinanceScene extends Phaser.Scene {
         this.add.text(x, y - h / 2 + 30, '市場 (MARKET)', { fontFamily: '"Noto Sans JP"', fontSize: '20px', color: '#e74c3c' }).setOrigin(0.5);
 
         // ALWAYS create content
-        this.renderMarketContent(x, y, w, h);
+        this.renderMarketContent(x, y);
 
         // Cover if locked
         this.marketLockOverlay = this.add.container(x, y).setDepth(10);
@@ -135,7 +135,7 @@ export class FinanceScene extends Phaser.Scene {
         this.marketLockOverlay.setVisible(!gm.futuresUnlocked);
     }
 
-    private renderMarketContent(x: number, y: number, w: number, h: number) {
+    private renderMarketContent(x: number, y: number) {
 
         // Info
         this.add.text(x, y - 240, '現在の市場レート', { fontSize: '14px', color: '#95a5a6', fontFamily: '"Noto Sans JP"' }).setOrigin(0.5);
@@ -236,7 +236,7 @@ export class FinanceScene extends Phaser.Scene {
         this.add.text(x, y - h / 2 + 30, '採掘 (MINING)', { fontFamily: '"Noto Sans JP"', fontSize: '20px', color: '#9b59b6' }).setOrigin(0.5);
 
         // ALWAYS create content
-        this.renderMiningContent(x, y, w, h);
+        this.renderMiningContent(x, y);
 
         // Cover if locked
         this.miningLockOverlay = this.add.container(x, y).setDepth(10);
@@ -248,7 +248,7 @@ export class FinanceScene extends Phaser.Scene {
         this.miningLockOverlay.setVisible(gm.cryptoLevel === 0);
     }
 
-    private renderMiningContent(x: number, y: number, w: number, h: number) {
+    private renderMiningContent(x: number, y: number) {
 
         // Stats
         const stY = y - 60;
