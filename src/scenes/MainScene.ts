@@ -1519,19 +1519,21 @@ export class MainScene extends Phaser.Scene {
         // Apply initial state
         this.conveyorGraphics.forEach(g => g.setVisible(gm.conveyorActive));
     }
-
     private shipTrash(trash: Trash) {
         if (trash.isDestroyed) return;
         const gm = GameManager.getInstance();
 
+        // Normalize type for capacity check
+        let type = trash.trashType === 'bio' ? 'bioCell' : trash.trashType;
+        if (trash.trashType === 'general') type = 'plastic';
+
         // Check Capacity per type (Buffer + Inventory)
-        const isFull = gm.getTypeOccupancy(trash.trashType) >= gm.refineryCapacity;
+        const isFull = gm.getTypeOccupancy(type) >= gm.refineryCapacity;
 
         if (isFull) {
             // "Discard" logic: play FX but don't add to buffer
             new FloatingText(this, trash.x, trash.y, "容量不足: 廃棄!", "#e74c3c");
         } else {
-            const type = trash.trashType === 'bio' ? 'bioCell' : trash.trashType;
             gm.shippedTrashBuffer.push({ type, x: trash.x });
             new FloatingText(this, trash.x, trash.y, "SHIPPED!", "#00d2d3");
         }

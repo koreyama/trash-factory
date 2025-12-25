@@ -162,8 +162,10 @@ export class GameManager {
     public refineryInventory: Record<string, number> = {}; // PERSISTENT
 
     public getTypeOccupancy(type: string): number {
-        // Normalize bio -> bioCell to match refineryInventory
-        const targetType = type === 'bio' ? 'bioCell' : type;
+        // Normalize types to match refineryInventory
+        let targetType = type;
+        if (type === 'general') targetType = 'plastic';
+        if (type === 'bio') targetType = 'bioCell';
 
         // Count in buffer
         let count = this.shippedTrashBuffer.filter(item => item.type === targetType).length;
@@ -1117,16 +1119,16 @@ export class GameManager {
     public getResourcePrice(type: string): number {
         const base = this.trashValue;
         const prices: Record<string, number> = {
-            'plastic': base * 0.1,
-            'metal': base * 0.1,
-            'circuit': base * 0.5,
-            'bioCell': base * 1.0,
-            'rareMetal': base * 2.0,
-            'radioactive': base * 5.0,
-            'darkMatter': base * 10.0,
-            'quantumCrystal': base * 50.0
+            'plastic': base * 0.25, // UP from 0.1
+            'metal': base * 0.4,   // UP from 0.1
+            'circuit': base * 0.8, // UP from 0.5
+            'bioCell': base * 1.0, // UP from 0.6
+            'rareMetal': base * 2.5, // UP from 1.5
+            'radioactive': base * 6.0, // UP from 4.0
+            'darkMatter': base * 20.0, // UP from 15.0
+            'quantumCrystal': base * 70.0 // UP from 50.0
         };
-        return prices[type] || base;
+        return Math.floor((prices[type] || 0) * this.marketingMultiplier * this.marketMultiplier * this.prestigeMultiplier);
     }
 
     public sellResources(types: ResourceType[], percent: number = 1.0): number {

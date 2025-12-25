@@ -42,8 +42,7 @@ export class Drone extends Phaser.GameObjects.Container {
         // We need access to MainScene's trash list or physics bodies
         // Hacky way: query world
         // Smart AI: Prioritize high value if upgraded
-        const ai = gm.getUpgrade('drone_ai');
-        const smartMode = (ai && ai.level > 0);
+        // Targeting nearest for maximizing collection efficiency (Manual override as requested)
 
         let bestTarget: Trash | null = null;
         let maxScore = -Infinity;
@@ -54,15 +53,7 @@ export class Drone extends Phaser.GameObjects.Container {
                 const t = b.gameObject as Trash;
                 const dist = Phaser.Math.Distance.Between(this.x, this.y, t.x, t.y);
 
-                let score = -dist; // Default: closer is better (higher score)
-
-                if (smartMode) {
-                    // Value Heuristic
-                    const typeScore = this.getTypeScore(t.trashType);
-                    // Weight value heavily against distance
-                    // e.g. 1 tier higher ~= 500px distance worth
-                    score = (typeScore * 500) - dist;
-                }
+                let score = -dist; // Prioritize nearest even for AI (User requested)
 
                 if (score > maxScore) {
                     maxScore = score;
@@ -157,21 +148,5 @@ export class Drone extends Phaser.GameObjects.Container {
                 this.target = null;
             }
         });
-    }
-
-    private getTypeScore(type: string): number {
-        switch (type) {
-            case 'quantum': return 10;
-            case 'satellite': return 9;
-            case 'nuclear': return 8;
-            case 'rareMetal': return 7;
-            case 'battery': return 6;
-            case 'medical': return 5;
-            case 'circuit': return 4;
-            case 'bio': return 3;
-            case 'metal': return 2;
-            case 'plastic': return 1;
-            default: return 0;
-        }
     }
 }
