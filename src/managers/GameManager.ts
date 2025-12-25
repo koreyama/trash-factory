@@ -112,6 +112,10 @@ export class GameManager {
     public laserPower: number = 0; // New mechanic
     public comboMultiplier: number = 1.0; // New mechanic
 
+    // Vacuum Preferences (Adjustable via Sliders)
+    public vacuumPowerPref: number = 1.0; // 0.0 to 1.0
+    public vacuumRangePref: number = 1.0;  // 0.0 to 1.0
+
     public critChance: number = 0;
     public marketingMultiplier: number = 1.0;
     public luckRate: number = 0.0;
@@ -918,6 +922,8 @@ export class GameManager {
         this.miningActive = false;
         this.miningIntensity = 1;
         this.autoSellThreshold = 0;
+        this.vacuumPowerPref = 1.0;
+        this.vacuumRangePref = 1.0;
 
         // Reset Roguelike Persistent Stats
         this.rogueGold = 0;
@@ -983,7 +989,9 @@ export class GameManager {
                 luckRate: this.luckRate,
                 droneUnlocked: this.droneUnlocked,
                 droneSpeed: this.droneSpeed,
-                marketingMultiplier: this.marketingMultiplier
+                marketingMultiplier: this.marketingMultiplier,
+                vacuumPowerPref: this.vacuumPowerPref,
+                vacuumRangePref: this.vacuumRangePref
             },
             upgrades: this.upgrades.map(u => ({ id: u.id, level: u.level })),
             achievements: this.achievements.map(a => ({ id: a.id, unlocked: a.unlocked })),
@@ -1064,6 +1072,8 @@ export class GameManager {
                 this.droneUnlocked = data.stats.droneUnlocked ?? false;
                 this.droneSpeed = data.stats.droneSpeed ?? 100;
                 this.marketingMultiplier = data.stats.marketingMultiplier ?? 1.0;
+                this.vacuumPowerPref = data.stats.vacuumPowerPref ?? 1.0;
+                this.vacuumRangePref = data.stats.vacuumRangePref ?? 1.0;
             }
 
             if (this.upgrades.length === 0) this.initUpgrades();

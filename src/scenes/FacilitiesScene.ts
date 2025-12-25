@@ -43,7 +43,7 @@ export class FacilitiesScene extends Phaser.Scene {
     private createList(container: Phaser.GameObjects.Container) {
         const gm = GameManager.getInstance();
         let yPos = 0;
-        const gap = 80;
+        const gap = 75; // Slightly reduced to fit more
 
         // Helper to check upgrade level
         const has = (id: string) => {
@@ -116,6 +116,62 @@ export class FacilitiesScene extends Phaser.Scene {
             yPos += gap;
         };
 
+        const addSlider = (label: string, value: number, onChange: (v: number) => void) => {
+            const bg = this.add.graphics();
+            bg.fillStyle(0x333333, 1);
+            bg.fillRoundedRect(-250, -35, 500, 70, 10);
+            bg.lineStyle(1, 0x00d2d3, 0.5);
+            bg.strokeRoundedRect(-250, -35, 500, 70, 10);
+
+            const titleText = this.add.text(-230, -25, label, {
+                fontFamily: '"Noto Sans JP", sans-serif',
+                fontSize: '18px',
+                color: '#00d2d3',
+                fontStyle: 'bold'
+            });
+
+            const barWidth = 300;
+            const barX = 50; // Offset from center
+            const bar = this.add.rectangle(barX, 0, barWidth, 4, 0x555555);
+
+            const handleX = barX - (barWidth / 2) + (value * barWidth);
+            const handle = this.add.circle(handleX, 0, 10, 0x00d2d3).setInteractive({ draggable: true, useHandCursor: true });
+
+            const valText = this.add.text(230, 0, `${Math.round(value * 100)}%`, {
+                fontFamily: '"Orbitron", monospace',
+                fontSize: '16px',
+                color: '#ffffff'
+            }).setOrigin(1, 0.5);
+
+            this.input.setDraggable(handle);
+            handle.on('drag', (_p: any, dragX: number) => {
+                const min = barX - barWidth / 2;
+                const max = barX + barWidth / 2;
+                const clampedX = Phaser.Math.Clamp(dragX, min, max);
+                handle.x = clampedX;
+                const v = (clampedX - min) / barWidth;
+                valText.setText(`${Math.round(v * 100)}%`);
+                onChange(v);
+            });
+
+            handle.on('dragend', () => {
+                SoundManager.getInstance().play('hover');
+                gm.save(); // Save preference
+            });
+
+            const elements = [bg, titleText, bar, handle, valText];
+            elements.forEach(el => {
+                if (el instanceof Phaser.GameObjects.Graphics) el.y = yPos;
+                else if (el instanceof Phaser.GameObjects.Rectangle) el.y = yPos;
+                else if (el instanceof Phaser.GameObjects.Arc) el.y = yPos;
+                else if (el === titleText) el.y = yPos - 25;
+                else el.y = yPos;
+            });
+
+            container.add(elements);
+            yPos += gap;
+        };
+
         // 1. Drone System
         if (gm.droneUnlocked) {
             addItem('ドローン配送システム', '自律的にゴミを回収します', gm.dronesActive, () => {
@@ -141,6 +197,16 @@ export class FacilitiesScene extends Phaser.Scene {
         if (has('magnet_field')) {
             addItem('磁力フィールド', '金属ゴミを中心に引き寄せます', gm.magnetActive, () => {
                 gm.magnetActive = !gm.magnetActive;
+            });
+        }
+
+        // --- Vacuum Tuning ---
+        if (has('vacuum_unlock')) {
+            addSlider('右クリック吸引力', gm.vacuumPowerPref, (v) => {
+                gm.vacuumPowerPref = v;
+            });
+            addSlider('右クリック吸引範囲', gm.vacuumRangePref, (v) => {
+                gm.vacuumRangePref = v;
             });
         }
 

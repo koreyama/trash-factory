@@ -734,8 +734,8 @@ export class MainScene extends Phaser.Scene {
     private handleVacuum(pointer: Phaser.Input.Pointer) {
         const gm = GameManager.getInstance();
         // Base stats from GM
-        let radius = gm.vacuumRange;
-        let force = gm.vacuumPower * 1.5; // Boosted force
+        let radius = gm.vacuumRange * gm.vacuumRangePref;
+        let force = gm.vacuumPower * 1.5 * gm.vacuumPowerPref; // Boosted force
 
         // Visual Feedback: Draw Range
         if (!this.vacuumGraphics) {
