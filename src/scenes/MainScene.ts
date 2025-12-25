@@ -1521,9 +1521,15 @@ export class MainScene extends Phaser.Scene {
 
     private shipTrash(trash: Trash) {
         if (trash.isDestroyed) return;
-        trash.isDestroyed = true; // Mark immediately
-
         const gm = GameManager.getInstance();
+
+        // Check Capacity
+        if (gm.shippedTrashBuffer.length >= gm.refineryCapacity) {
+            new FloatingText(this, trash.x, trash.y, "精製所満杯!", "#e74c3c");
+            return;
+        }
+
+        trash.isDestroyed = true; // Mark immediately
         const type = trash.trashType === 'bio' ? 'bioCell' : trash.trashType;
         gm.shippedTrashBuffer.push({ type, x: trash.x });
 

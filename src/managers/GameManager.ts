@@ -158,6 +158,7 @@ export class GameManager {
     public conveyorUnlocked: boolean = false; // New: Conveyor facility
     public conveyorActive: boolean = false; // Default OFF
     public shippedTrashBuffer: any[] = []; // New: Stores trash between main and refinery
+    public refineryCapacity: number = 20; // NEW: Cap for shippedTrashBuffer
     public refineryInventory: Record<string, number> = {}; // PERSISTENT
 
     // Facility State (Centralized)
@@ -289,6 +290,9 @@ export class GameManager {
 
         // Tier 4
         add('unlock_conveyor', 'ベルトコンベア', 'ゴミを精製所へ送り自動処理する', 50000, 'floor_capacity', 1, 1, { x: 0, y: -4 }, (gm) => { gm.conveyorUnlocked = true; }, { type: 'metal', amount: 200 });
+        add('refinery_capacity', '精製所容量拡張', '精製所に送れるゴミの最大数UP (+30/Lv)', 30000, 'unlock_conveyor', 10, 2.0, { x: 1, y: -4 }, (gm, lv) => {
+            gm.refineryCapacity = 20 + (lv * 30);
+        }, { type: 'metal', amount: 500 });
 
         // Tier 5
         add('incinerator', '廃棄物発電', 'バイオゴミ消却時にエナジー', 100000, 'unlock_conveyor', 5, 1.6, { x: 0, y: -5 }, () => { }, { type: 'bioCell', amount: 500 });
@@ -906,6 +910,8 @@ export class GameManager {
         this.comboMultiplier = 1.0;
         this.conveyorUnlocked = false;
         this.conveyorActive = false;
+        this.refineryCapacity = 20;
+        this.shippedTrashBuffer = [];
         this.magnetActive = false;
         this.laserActive = false;
         this.blackHoleActive = false;

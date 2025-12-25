@@ -288,8 +288,6 @@ export class RefineryScene extends Phaser.Scene {
         }
 
         gm.addResource(resType, Math.floor((gm.plasticPerTrash || 1) * mult));
-        const earnings = Math.floor(gm.trashValue * mult * gm.marketMultiplier);
-        gm.addMoney(earnings); // Money also scales with market
 
         if (gm.futuresUnlocked && gm.marketMultiplier !== 1.0) {
             // Maybe show extra feedback?
