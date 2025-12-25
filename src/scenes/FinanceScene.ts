@@ -43,10 +43,17 @@ export class FinanceScene extends Phaser.Scene {
     update(_time: number, delta: number) {
         // Fix: Force GameManager update if paused
         // Use fixed delta to prevent NaN or huge jumps matching 60fps
-        const d = delta || 16.66;
-        GameManager.getInstance().update(d);
-
+        const gm = GameManager.getInstance();
+        gm.update(delta);
         this.updateUI();
+
+        // Real-time unlock check
+        if (this.marketLockOverlay) {
+            this.marketLockOverlay.setVisible(!gm.futuresUnlocked);
+        }
+        if (this.miningLockOverlay) {
+            this.miningLockOverlay.setVisible(gm.cryptoLevel === 0);
+        }
     }
 
     // ================= BANK =================
@@ -104,8 +111,10 @@ export class FinanceScene extends Phaser.Scene {
     private txtInventory!: Phaser.GameObjects.Text;
 
     // Changed types to avoid import issues
-    private selectedResources: Set<string> = new Set(['plastic', 'metal', 'circuit', 'bioCell', 'rareMetal', 'radioactive', 'darkMatter', 'quantumCrystal']);
     private availableResources: string[] = ['plastic', 'metal', 'circuit', 'bioCell', 'rareMetal', 'radioactive', 'darkMatter', 'quantumCrystal'];
+    private selectedResources: Set<string> = new Set(['plastic', 'metal', 'circuit']);
+    private marketLockOverlay!: Phaser.GameObjects.Container;
+    private miningLockOverlay!: Phaser.GameObjects.Container;
 
     private createMarketPanel(x: number, y: number, w: number, h: number) {
         const gm = GameManager.getInstance();
@@ -113,10 +122,20 @@ export class FinanceScene extends Phaser.Scene {
         this.add.rectangle(x, y, w, h, 0x1a1a1a).setStrokeStyle(1, 0x555555);
         this.add.text(x, y - h / 2 + 30, '市場 (MARKET)', { fontFamily: '"Noto Sans JP"', fontSize: '20px', color: '#e74c3c' }).setOrigin(0.5);
 
-        if (!gm.futuresUnlocked) {
-            this.add.text(x, y, 'LOCKED (Tier 6 Required)', { color: '#e74c3c', fontSize: '18px' }).setOrigin(0.5);
-            return;
-        }
+        // ALWAYS create content
+        this.renderMarketContent(x, y, w, h);
+
+        // Cover if locked
+        this.marketLockOverlay = this.add.container(x, y).setDepth(10);
+        const lockBg = this.add.rectangle(0, 0, w, h, 0x000000, 0.85);
+        const lockTxt = this.add.text(0, 0, 'LOCKED\n(産業革命が必要)', {
+            color: '#e74c3c', fontSize: '24px', align: 'center', fontFamily: '"Noto Sans JP"'
+        }).setOrigin(0.5);
+        this.marketLockOverlay.add([lockBg, lockTxt]);
+        this.marketLockOverlay.setVisible(!gm.futuresUnlocked);
+    }
+
+    private renderMarketContent(x: number, y: number, w: number, h: number) {
 
         // Info
         this.add.text(x, y - 240, '現在の市場レート', { fontSize: '14px', color: '#95a5a6', fontFamily: '"Noto Sans JP"' }).setOrigin(0.5);
@@ -216,10 +235,20 @@ export class FinanceScene extends Phaser.Scene {
         this.add.rectangle(x, y, w, h, 0x1a1a1a).setStrokeStyle(1, 0x555555);
         this.add.text(x, y - h / 2 + 30, '採掘 (MINING)', { fontFamily: '"Noto Sans JP"', fontSize: '20px', color: '#9b59b6' }).setOrigin(0.5);
 
-        if (gm.cryptoLevel === 0) {
-            this.add.text(x, y, 'LOCKED (Tier 7 Required)', { color: '#e74c3c', fontSize: '18px' }).setOrigin(0.5);
-            return;
-        }
+        // ALWAYS create content
+        this.renderMiningContent(x, y, w, h);
+
+        // Cover if locked
+        this.miningLockOverlay = this.add.container(x, y).setDepth(10);
+        const lockBg = this.add.rectangle(0, 0, w, h, 0x000000, 0.85);
+        const lockTxt = this.add.text(0, 0, 'LOCKED\n(仮想通貨マイニングが必要)', {
+            color: '#9b59b6', fontSize: '24px', align: 'center', fontFamily: '"Noto Sans JP"'
+        }).setOrigin(0.5);
+        this.miningLockOverlay.add([lockBg, lockTxt]);
+        this.miningLockOverlay.setVisible(gm.cryptoLevel === 0);
+    }
+
+    private renderMiningContent(x: number, y: number, w: number, h: number) {
 
         // Stats
         const stY = y - 60;
@@ -232,6 +261,7 @@ export class FinanceScene extends Phaser.Scene {
         this.lblToggle = this.add.text(x, y + 80, 'START', { fontSize: '18px', color: '#fff' }).setOrigin(0.5);
 
         this.btnToggle.on('pointerdown', () => {
+            const gm = GameManager.getInstance(); // Fix gm ref
             gm.miningActive = !gm.miningActive;
             SoundManager.getInstance().play('click');
         });

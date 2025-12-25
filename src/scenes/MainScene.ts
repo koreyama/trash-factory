@@ -594,7 +594,8 @@ export class MainScene extends Phaser.Scene {
                 const trash = b.gameObject as Trash;
 
                 // Guaranteed Shipping Check: If on right edge area of the belt
-                if (trash.x > width - 70 && trash.y > height - 100) {
+                // Extended range slightly to ensure collection
+                if (trash.x > width - 100 && trash.y > height - 120) {
                     this.shipTrash(trash);
                     return;
                 }

@@ -68,10 +68,12 @@ export class Trash extends Phaser.Physics.Matter.Image {
     public onClicked(forceCrit: boolean = false): void {
         if (this.isDestroyed) return;
 
-        this.destroyTrash(forceCrit);
+        // Manual click is always NOT forceCrit (drones use forceCrit=true)
+        // Actually, let's use a more explicit check or just assume clicked = manual
+        this.destroyTrash(forceCrit, !forceCrit); // Drones use forceCrit, so !forceCrit is true for manual clicks
     }
 
-    public destroyTrash(forceCrit: boolean = false): void {
+    public destroyTrash(forceCrit: boolean = false, isManual: boolean = false): void {
         this.isDestroyed = true;
 
         const gm = GameManager.getInstance();
@@ -98,35 +100,47 @@ export class Trash extends Phaser.Physics.Matter.Image {
             value *= 3;
         }
 
-        if (this.trashType === 'general') {
-            gm.addMoney(value);
-        } else if (this.trashType === 'plastic') {
+        const calcValue = () => {
+            if (this.trashType === 'general') return value;
+            if (this.trashType === 'plastic') return Math.floor(value * 1.5);
+            if (this.trashType === 'metal') return Math.floor(value * 3.0);
+            if (this.trashType === 'circuit') return Math.floor(value * 5.0);
+            if (this.trashType === 'bio') return Math.floor(value * 4.0);
+            if (this.trashType === 'battery') return Math.floor(value * 6.0);
+            if (this.trashType === 'medical') return Math.floor(value * 5.0);
+            if (this.trashType === 'nuclear') return Math.floor(value * 8.0);
+            if (this.trashType === 'satellite') return Math.floor(value * 10.0);
+            if (this.trashType === 'quantum') return Math.floor(value * 15.0);
+            return value;
+        };
+
+        const finalMoney = calcValue();
+
+        if (isManual) {
+            gm.incrementPressCheck(); // Track manual collection
+            gm.addMoney(finalMoney);
+        } else {
+            gm.addMoney(finalMoney);
+        }
+
+        if (this.trashType === 'plastic') {
             gm.addResource('plastic', gm.plasticPerTrash);
-            gm.addMoney(Math.floor(value * 1.5));
         } else if (this.trashType === 'metal') {
             gm.addResource('metal', 1);
-            gm.addMoney(Math.floor(value * 3.0));
         } else if (this.trashType === 'circuit') {
             gm.addResource('circuit', 1);
-            gm.addMoney(Math.floor(value * 5.0));
         } else if (this.trashType === 'bio') {
             gm.addResource('bioCell', 1);
-            gm.addMoney(Math.floor(value * 4.0));
         } else if (this.trashType === 'battery') {
             gm.addResource('rareMetal', 1);
-            gm.addMoney(Math.floor(value * 6.0));
         } else if (this.trashType === 'medical') {
             gm.addResource('bioCell', 2);
-            gm.addMoney(Math.floor(value * 5.0));
         } else if (this.trashType === 'nuclear') {
             gm.addResource('radioactive', 1);
-            gm.addMoney(Math.floor(value * 8.0));
         } else if (this.trashType === 'satellite') {
             gm.addResource('darkMatter', 1);
-            gm.addMoney(Math.floor(value * 10.0));
         } else if (this.trashType === 'quantum') {
             gm.addResource('quantumCrystal', 1);
-            gm.addMoney(Math.floor(value * 15.0));
         }
 
         this.scene.events.emit('trash-destroyed', { x: this.x, y: this.y, amount: value, type: this.trashType, isCrit, isGold, isRainbow });
