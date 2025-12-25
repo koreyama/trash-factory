@@ -1524,8 +1524,8 @@ export class MainScene extends Phaser.Scene {
         if (trash.isDestroyed) return;
         const gm = GameManager.getInstance();
 
-        // Check Global Capacity (Buffer + Inventory)
-        const isFull = gm.getRefineryOccupancy() >= gm.refineryCapacity;
+        // Check Capacity per type (Buffer + Inventory)
+        const isFull = gm.getTypeOccupancy(trash.trashType) >= gm.refineryCapacity;
 
         if (isFull) {
             // "Discard" logic: play FX but don't add to buffer

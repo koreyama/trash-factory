@@ -161,11 +161,16 @@ export class GameManager {
     public refineryCapacity: number = 100; // NEW: Cap for shippedTrashBuffer (increased to 100)
     public refineryInventory: Record<string, number> = {}; // PERSISTENT
 
-    public getRefineryOccupancy(): number {
-        let count = this.shippedTrashBuffer.length;
-        for (const type in this.refineryInventory) {
-            count += this.refineryInventory[type] || 0;
-        }
+    public getTypeOccupancy(type: string): number {
+        // Normalize bio -> bioCell to match refineryInventory
+        const targetType = type === 'bio' ? 'bioCell' : type;
+
+        // Count in buffer
+        let count = this.shippedTrashBuffer.filter(item => item.type === targetType).length;
+
+        // Count in stored refinery inventory
+        count += this.refineryInventory[targetType] || 0;
+
         return count;
     }
 
@@ -298,7 +303,7 @@ export class GameManager {
 
         // Tier 4
         add('unlock_conveyor', 'ベルトコンベア', 'ゴミを精製所へ送り自動処理する', 50000, 'floor_capacity', 1, 1, { x: 0, y: -4 }, (gm) => { gm.conveyorUnlocked = true; }, { type: 'metal', amount: 200 });
-        add('refinery_capacity', '精製所容量拡張', '精製所に送れるゴミの最大数UP (+100/Lv)', 30000, 'unlock_conveyor', 10, 2.0, { x: 1, y: -4 }, (gm, lv) => {
+        add('refinery_capacity', '精製所容量拡張', '各素材の最大保管数UP (+100/Lv)', 30000, 'unlock_conveyor', 10, 2.0, { x: 1, y: -4 }, (gm, lv) => {
             gm.refineryCapacity = 100 + (lv * 100);
         }, { type: 'metal', amount: 500 });
 
