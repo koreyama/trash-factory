@@ -274,17 +274,17 @@ export class RefineryScene extends Phaser.Scene {
 
         // Expanded Mapping Logic
         switch (tType) {
-            case 'general': resType = 'plastic'; mult = 1; break;
-            case 'plastic': resType = 'plastic'; mult = 3; break;
-            case 'metal': resType = 'metal'; mult = 3; break;
-            case 'circuit': resType = 'circuit'; mult = 3; break;
-            case 'bio': resType = 'bioCell'; mult = 3; break;
-            case 'battery': resType = 'rareMetal'; mult = 5; break;
-            case 'medical': resType = 'bioCell'; mult = 6; break;
-            case 'nuclear': resType = 'radioactive'; mult = 8; break;
-            case 'satellite': resType = 'darkMatter'; mult = 10; break;
-            case 'quantum': resType = 'quantumCrystal'; mult = 15; break;
-            default: resType = 'plastic'; break;
+            case 'general': resType = 'plastic'; mult = 0.5; break;
+            case 'plastic': resType = 'plastic'; mult = 1.5; break;
+            case 'metal': resType = 'metal'; mult = 1.5; break;
+            case 'circuit': resType = 'circuit'; mult = 1.5; break;
+            case 'bio': resType = 'bioCell'; mult = 1.5; break;
+            case 'battery': resType = 'rareMetal'; mult = 2.5; break;
+            case 'medical': resType = 'bioCell'; mult = 3; break;
+            case 'nuclear': resType = 'radioactive'; mult = 4; break;
+            case 'satellite': resType = 'darkMatter'; mult = 5; break;
+            case 'quantum': resType = 'quantumCrystal'; mult = 7.5; break;
+            default: resType = 'plastic'; mult = 0.5; break;
         }
 
         gm.addResource(resType, (gm.plasticPerTrash || 1) * mult);

@@ -1101,14 +1101,14 @@ export class GameManager {
         const base = this.trashValue;
 
         const prices: Record<string, number> = {
-            'plastic': base * 2,
-            'metal': base * 2,
-            'circuit': base * 5,
-            'bioCell': base * 10,
-            'rareMetal': base * 20,
-            'radioactive': base * 50,
-            'darkMatter': base * 100,
-            'quantumCrystal': base * 500
+            'plastic': base * 1.2,
+            'metal': base * 1.2,
+            'circuit': base * 3,
+            'bioCell': base * 5,
+            'rareMetal': base * 10,
+            'radioactive': base * 20,
+            'darkMatter': base * 40,
+            'quantumCrystal': base * 100
         };
 
         types.forEach(type => {
