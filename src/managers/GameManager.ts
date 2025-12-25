@@ -92,8 +92,22 @@ export class GameManager {
 
     // Energy System (New)
     public energy: number = 0;
-    public maxEnergy: number = 100;
-    public energyGeneration: number = 0;
+    public get maxEnergy(): number {
+        let base = 100;
+        const battery = this.getUpgrade('battery_upgrade');
+        if (battery) base += battery.level * 100;
+        const fusion = this.getUpgrade('fusion_reactor');
+        if (fusion) base += fusion.level * 1000;
+        return base;
+    }
+    public get energyGeneration(): number {
+        let gen = 0;
+        const solar = this.getUpgrade('solar_panel');
+        if (solar) gen += solar.level * 1;
+        const nuclear = this.getUpgrade('nuclear_reactor');
+        if (nuclear) gen += nuclear.level * 10;
+        return gen;
+    }
 
     public laserPower: number = 0; // New mechanic
     public comboMultiplier: number = 1.0; // New mechanic
@@ -278,8 +292,8 @@ export class GameManager {
 
         // Tier 6
         add('unlock_nuclear', '核廃棄物処理', '核廃棄物が出現', 3000000, 'incinerator', 1, 1, { x: -1, y: -5 }, () => { }, { type: 'rareMetal', amount: 1000 });
-        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -1, y: -6 }, (gm, lv) => { gm.energyGeneration += lv * 10; }, { type: 'radioactive', amount: 500 });
-        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -1, y: -7 }, (gm) => { gm.maxEnergy += 1000; }, { type: 'radioactive', amount: 1000 });
+        add('nuclear_reactor', '原子炉', 'エネルギー生成+10/秒', 10000000, 'unlock_nuclear', 5, 1.5, { x: -1, y: -6 }, () => { }, { type: 'radioactive', amount: 500 });
+        add('fusion_reactor', '核融合炉', 'エネルギー最大値+1000', 100000000, 'nuclear_reactor', 1, 1, { x: -1, y: -7 }, () => { }, { type: 'radioactive', amount: 1000 });
 
         // Tier 7
         add('nanobot_swarm', 'ナノボット', '画面全体のゴミを徐々に分解', 1000000, 'incinerator', 1, 1, { x: 0, y: -6 }, () => { }, { type: 'circuit', amount: 5000 });
@@ -355,12 +369,8 @@ export class GameManager {
         add('singularity_engine', '特異点エンジン', 'ブラックホールの成長速度UP', 150000, 'black_hole_unlock', 3, 2.0, { x: -4, y: 0 }, () => { }, { type: 'rareMetal', amount: 500 });
 
         // Tier 4 (Energy)
-        add('solar_panel', 'ソーラーパネル', '毎秒エネルギー+1/Lv', 20000, 'vacuum_power', 10, 1.5, { x: -2, y: -2 }, (gm, lv) => {
-            gm.energyGeneration = lv * 1;
-        }, { type: 'metal', amount: 500 });
-        add('battery_upgrade', '大容量蓄電池', '最大エネルギー保存量UP', 50000, 'solar_panel', 5, 1.5, { x: -2, y: -3 }, (gm, lv) => {
-            gm.maxEnergy = 100 + (lv * 100);
-        }, { type: 'metal', amount: 1000 });
+        add('solar_panel', 'ソーラーパネル', '毎秒エネルギー+1/Lv', 20000, 'vacuum_power', 10, 1.5, { x: -2, y: -2 }, () => { }, { type: 'metal', amount: 500 });
+        add('battery_upgrade', '大容量蓄電池', '最大エネルギー保存量UP', 50000, 'solar_panel', 5, 1.5, { x: -2, y: -3 }, () => { }, { type: 'metal', amount: 1000 });
         add('laser_grid', '防衛レーザー', '自動焦却（エネルギー消費）', 250000, 'battery_upgrade', 5, 2.0, { x: -1, y: -2 }, (gm, lv) => {
             gm.laserPower = lv * 10;
         }, { type: 'circuit', amount: 800 });
@@ -855,8 +865,6 @@ export class GameManager {
         this.darkMatter = 0;
         this.quantumCrystal = 0;
         this.energy = 0;
-        this.maxEnergy = 100;
-        this.energyGeneration = 0;
 
         // Reset Lifetime Stats
         this.totalMoney = 0;
@@ -943,6 +951,7 @@ export class GameManager {
             radioactive: this.radioactive,
             darkMatter: this.darkMatter,
             quantumCrystal: this.quantumCrystal,
+            energy: this.energy,
 
             // Lifetime
             totalMoney: this.totalMoney,
@@ -1021,6 +1030,8 @@ export class GameManager {
             this.radioactive = data.radioactive || 0;
             this.darkMatter = data.darkMatter || 0;
             this.quantumCrystal = data.quantumCrystal || 0;
+            this.energy = data.energy || 0;
+            if (this.energy > this.maxEnergy) this.energy = this.maxEnergy;
 
             this.totalMoney = Math.floor(data.totalMoney || this.money);
             this.totalPlastic = data.totalPlastic || this.plastic;
